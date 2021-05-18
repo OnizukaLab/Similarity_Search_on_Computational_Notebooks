@@ -3,6 +3,24 @@ import networkx as nx
 
 #from mymodule.workflow_matching import WorkflowMatching
 
+class QueryNode(models.Model):
+    node_id = models.PositiveIntegerField()
+    node_type = models.CharField(max_length=200)
+    node_contents = models.TextField()
+    def __str__(self):
+        return "QueryNode" + str(self.node_id)
+
+class QueryEdge(models.Model):
+    parent_node_id = models.PositiveBigIntegerField()
+    successor_node_id = models.PositiveBigIntegerField()
+    def __str__(self):
+        return "QueryEdge(" + str(self.parent_node_id) + "," + str(self.successor_node_id) + ")"
+
+class QueryLibrary(models.Model):
+    library_name = models.CharField(max_length=200)
+    def __str__(self):
+        return "Library\"" + str(self.library_name) + "\""
+
 """
 # Create your models here.
 def make_sample_query_nx2_3_another2_with_wildcard_2(self): #論文用
