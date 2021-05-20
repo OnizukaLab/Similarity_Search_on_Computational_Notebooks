@@ -231,6 +231,84 @@ def build_QueryGraph():
     return QueryGraph, query_root, query_lib, query_cell_code, query_table, node_id_to_node_name
 
 
+def dump_to_json(QueryNode_object_list, QueryEdge_object_list, QueryLibrary_object_list):
+    """
+    QueryNode, QueryEdge, QueryLibraryをまとめて一つのjsonファイルにする．
+    """
+    json_file = ""
+    json_file += "{\"QueryNode\":"
+    for QueryNode_object in QueryNode_object_list:
+        json_file += "{" + f"\"node_id\":{QueryNode_object.node_id},\"node_type\":{QueryNode_object.node_type},\"node_contents\":{QueryNode_object.node_contents}" + "}"
+    json_file += ",\"QueryEdge\":"
+    for QueryEdge_object in QueryEdge_object_list:
+        json_file += "{" + f"\"parent_node_id\":{QueryEdge_object.parent_node_id},\"successor_node_id\":{QueryEdge_object.successor_node_id}" + "}"
+    json_file += ",\"QueryLibrary\":"
+    for QueryLibrary_object in QueryLibrary_object_list:
+        json_file += "{" + f"\"library_name\":{QueryLibrary_object.library_name}" + "}"
+    json_file += "}"
+    return json_file
+
+def build_query_from_json(json_file):
+    QueryGraph = nx.DiGraph()
+    dictionary = json.loads(json_file)
+    #node_object_list = QueryNode.objects.all()
+    query_cell_code={}
+    query_table={}
+
+    # ノード名設定用の変数3つ. int.
+    code_id=0
+    data_id=0
+    output_id=0
+
+    # edge設定用の{ノード番号:ノード名}の辞書. {int: string}.
+    node_id_to_node_name={}
+
+    for node in dictionary["QueryNode"]:
+        if node["node_type"]=="code":
+            node_name = f"cell_query_{code_id}"
+            QueryGraph.add_node(node_name, node_type="Cell", node_id=node["node_id"])
+            query_cell_code[node_name] = node["node_contents"]
+            node_id_to_node_name[node["node_id"]]=node_name
+            code_id+=1
+        elif node["node_type"]=="data":
+            node_name = f"query_var{data_id}"
+            QueryGraph.add_node(node_name, node_type="Var", node_id=node["node_id"])
+            query_table[node_name] = node["node_contents"]
+            node_id_to_node_name[node["node_id"]]=node_name
+            data_id+=1
+        elif node["node_type"]=="output":
+            # TODO:display_type="text"を正しい内容に変更．
+            node_name = f"query_display{data_id}"
+            QueryGraph.add_node(node_name, node_type="Display_data", display_type="text", node_id=node["node_id"])
+            node_id_to_node_name[node["node_id"]]=node_name
+            output_id+=1
+        logging.info(f"{node_name} appended to QueryGraph.")
+    
+    library_list=[]
+    for library in dictionary["QueryLibrary"]:
+        library_list.append(library["library_name"])
+    query_lib=pd.Series(library_list)
+    
+    for edge in dictionary["QueryEdge"]:
+        QueryGraph.add_edge(node_id_to_node_name[edge["parent_node_id"]], node_id_to_node_name[edge["successor_node_id"]])
+
+    query_root=None
+    root_count=0
+    for n in QueryGraph.nodes():
+        if len(list(QueryGraph.predecessors(n)))==0:
+            logging.info(f"{n} is root node.")
+            query_root = n
+            root_count+=1
+            #break
+        #logging.info(f"{n} is not root node.")
+    if root_count>1:
+        logging.info("Only a node is allowed in query graph.")
+        sys.exit(1)
+    
+    logging.info("Completed!: Building a query graph.")
+    return QueryGraph, query_root, query_lib, query_cell_code, query_table, node_id_to_node_name
+
+
 
 def search(wm, w_c, w_v, w_l, w_d, k, flg_chk_invalid_by_workflow_structure=True, flg_flg_prune_under_sim=True, flg_optimize_calc_order=True, flg_caching=True, flg_calc_data_sim_approximately=False, flg_cache_query_table=False, save_running_time=False):
     return searching_top_k_notebooks(wm, w_c, w_v, w_l, w_d, k, flg_chk_invalid_by_workflow_structure=flg_chk_invalid_by_workflow_structure, flg_flg_prune_under_sim=flg_flg_prune_under_sim, flg_optimize_calc_order=flg_optimize_calc_order, flg_caching=flg_caching, flg_calc_data_sim_approximately=flg_calc_data_sim_approximately, flg_cache_query_table=flg_cache_query_table, save_running_time=save_running_time)
