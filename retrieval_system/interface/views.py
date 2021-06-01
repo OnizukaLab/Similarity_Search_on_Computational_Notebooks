@@ -88,10 +88,12 @@ wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_na
 
 
 
+"""
 
-def index(request):
+def main(request):
     return render(request, 'interface/index.html', {'w_C':0, 'w_D':0, 'w_L':0, 'w_O':0})
     #return HttpResponse("index page.")
+"""
 
 
 """
@@ -115,7 +117,8 @@ def search(request):
         return render(request, 'interface/index.html', arg_list)
 """
 
-def show_query_graph(request, *args, **kwargs):
+#不使用
+def index_old(request, *args, **kwargs):
 
     wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
     #wm.set_db_graph2(G_in_this_nb)
@@ -153,7 +156,8 @@ def show_query_graph(request, *args, **kwargs):
     node_object_list = QueryNode.objects.all()
     return render(request, 'interface/querygraph.html', {'node_object_list': node_object_list, 'node_id_to_node_name': node_id_to_node_name, "debug_data":debug_data})
 
-def form(request, *args, **kwargs):
+#不使用
+def form_old(request, *args, **kwargs):
 
     wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
     #wm.set_db_graph2(G_in_this_nb)
@@ -171,8 +175,99 @@ def form(request, *args, **kwargs):
         
     #top_k_result, nb_score = search(wm, w_c=8, w_v=1, w_l=1, w_d=1, k=5)
 
-    #node_object_list = QueryNode.objects.all()
+    node_object_list = QueryNode.objects.all()
     return render(request, 'interface/querygraph.html', {'node_object_list': node_object_list, 'node_id_to_node_name': node_id_to_node_name, "debug_data":debug_data})
+
+def index(request, *args, **kwargs):
+
+    wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
+    #wm.set_db_graph2(G_in_this_nb)
+    #wm, G_in_this_nb = get_db_graph(wm)
+    debug_data=""
+    debug_data=request.POST
+    request_data=request.POST
+    #node_object_list = []
+    #for item in QueryNode.objects.all():
+    #    node_object_list.append(item)
+    node_object_list = QueryNode.objects.all()
+    wm, node_id_to_node_name = build_QueryGraph(wm, node_object_list)
+    #top_k_result, nb_score = search(wm, w_c=8, w_v=1, w_l=1, w_d=1, k=5)
+    return render(request, 'interface/index.html', {'node_object_list': node_object_list, 'node_id_to_node_name': node_id_to_node_name, "debug_data":debug_data})
+
+def form(request, *args, **kwargs):
+
+    wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
+    #wm.set_db_graph2(G_in_this_nb)
+    #wm, G_in_this_nb = get_db_graph(wm)
+    debug_data=""
+    debug_data=request.POST
+    request_data=request.POST
+    node_id = int(request_data["input_node_id"])
+    node_type = request_data["input_node_type"]
+    node_contents="node_contents"
+    node_contents = request_data["input_node_contents"]
+    new_node = QueryNode(node_id=node_id, node_type=node_type, node_contents=node_contents)
+    QueryNode.objects.filter(node_id=node_id).delete()
+    new_node.save()
+    node_object_list = QueryNode.objects.all()
+
+    wm, node_id_to_node_name = build_QueryGraph(wm, node_object_list)
+        
+    #top_k_result, nb_score = search(wm, w_c=8, w_v=1, w_l=1, w_d=1, k=5)
+
+    #node_object_list = QueryNode.objects.all()
+    return render(request, 'interface/index.html', {'node_object_list': node_object_list, 'node_id_to_node_name': node_id_to_node_name, "debug_data":debug_data})
+
+#不使用
+def index_not_use_query_database(request, *args, **kwargs):
+
+    wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
+    #wm.set_db_graph2(G_in_this_nb)
+    #wm, G_in_this_nb = get_db_graph(wm)
+    debug_data=""
+    debug_data=request.POST
+    request_data=request.POST
+    node_object_list = []
+    for item in QueryNode.objects.all():
+        node_object_list.append(item)
+    wm, node_id_to_node_name = build_QueryGraph(wm, node_object_list)
+    #top_k_result, nb_score = search(wm, w_c=8, w_v=1, w_l=1, w_d=1, k=5)
+    return render(request, 'interface/index.html', {'node_object_list': node_object_list, 'node_id_to_node_name': node_id_to_node_name, "debug_data":debug_data})
+
+#不使用
+def form_not_use_query_database(request, *args, **kwargs):
+
+    wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
+    #wm.set_db_graph2(G_in_this_nb)
+    #wm, G_in_this_nb = get_db_graph(wm)
+    debug_data=""
+    debug_data=request.POST
+    request_data=request.POST
+    node_id = int(request_data["input_node_id"])
+    node_type = request_data["input_node_type"]
+    node_contents="node_contents"
+    node_contents = request_data["input_node_contents"]
+    new_node = QueryNode(node_id=node_id, node_type=node_type, node_contents=node_contents)
+    node_object_list = []
+    for item in QueryNode.objects.all():
+        node_object_list.append(item)
+    for item in node_object_list:
+        if item.node_id==node_id:
+            node_object_list.remove(item)
+    
+    node_object_list.append(new_node)
+
+    node_object_list=[]
+    for i in range(len(request_data["node_id"][0])):
+        #debug_data=str(len(request_data["node_id"]))
+        q = QueryNode(node_id=request_data["node_id"][i], node_type=request_data["node_type"][i], node_contents=request_data["node_contents"][i])
+        node_object_list.append(q)
+
+    wm, node_id_to_node_name = build_QueryGraph(wm, node_object_list)
+        
+    #top_k_result, nb_score = search(wm, w_c=8, w_v=1, w_l=1, w_d=1, k=5)
+
+    return render(request, 'interface/index.html', {'node_object_list': node_object_list, 'node_id_to_node_name': node_id_to_node_name, "debug_data":debug_data})
 
 def show_query_graph_redirect(request, *args, **kwargs):
     wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
@@ -361,13 +456,13 @@ def build_QueryGraph_old():
     return QueryGraph, query_root, query_lib, query_cell_code, query_table, node_id_to_node_name
 
 
-def build_QueryGraph(wm):
+def build_QueryGraph(wm, node_object_list):
     """
     wm: WorkflowMatchingのインスタンス．
     build_QueryGraph_oldと異なり，wmを引数として返り値もwm．
     """
     QueryGraph = nx.DiGraph()
-    node_object_list = QueryNode.objects.all()
+    #node_object_list = QueryNode.objects.all()
     query_cell_code={}
     query_table={}
 

@@ -81,85 +81,11 @@
 <body>
     <script src="https://d3js.org/d3.v5.js"></script>
     <script src="{% static 'interface/javascript/style.js' %}"></script>
-
-<div class="inner">
-
-{# output = '<br>'.join([node.node_contents for node in node_object_list]) #}
-{% for node in node_object_list %}
-{{ node.node_contents }}
-<br/>
-{% endfor %}
-
-
-{# output += '<br><br>*** Graph\'s Information ***<br>' + '<br>'.join([f"{node_name} ----- {node_id}" for node_id, node_name in node_id_to_node_name.items()]) #}
-*** Graph's Information ***
-<br/>
-{% for node_id, node_name in node_id_to_node_name.items %}
-{{ node_name }} ----- {{ node_id }}
-<br/>
-{% endfor %}
-
-
-<div class="my_color">
----- Query Graph ----
-<form method="POST" id="myform">
-    {% csrf_token %}
-    {{ form.management_form }}
-    <div class="text">
-        {{ form.empty_form.as_p }}
-    </div>
-    <button type="button" id="btn-clone">clone</button>
-    <button type="submit">submit</button>
-</form>
-<form method="post">
-    {% csrf_token %}
-    {{ formset }}
-    <button type="submit">submit</button>
-</form>
-</div>
-
-
-<div class="wrapper">
-
-<div class="column cat1">
-    <div id="my_dataviz"></div>
-    <div id="my_dataviz2"></div>
-</div>
-
-<div class="column cat2">
-    <div class="input_form">
-        <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
-        <input type="submit" name="submit_button" value="submit"> 
-        <br/>
-        {% for node in node_object_list %}
-            {% csrf_token %}
-            <label>node id: </label>
-            <input type="text" name="node_id" value={{ node.node_id }} class="input_form3">
-            <br/>
-            <label>node type: </label>
-            <input type="text" name="node_type" value={{ node.node_type }} class="input_form3">
-            <br/>
-node_contents:
-            <br/>
-            <textarea name="node_contents" value="value"+{{ node.node_id }} cols="50" rows="10" class="input_form3">{{ node.node_contents }}</textarea>
-            <br/>
-        {% endfor %}
-        </form>
-    </div>
-</div>
-
-</div>
-
-
-<div class = "for_debug">
-    <p>
-    debug: <br/>
-    {{debug_data}}
-    </p>
-</div>
-
-</div>
-
+    <form method="post">
+        {% csrf_token %}
+        {{ formset }}
+        <button type="submit">submit</button>
+    </form>
 
 
 
