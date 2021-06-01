@@ -1597,7 +1597,7 @@ class WorkflowMatching:
                 self.ArtificalG.add_edge(nA, nB)
 
     def set_query_workflow_info(self):
-        self.query_workflow_info={"Cell": 0, "Var": 0, "Display_data": {}, "max_indegree": 0, "max_outdegree": 0}
+        self.query_workflow_info={"Cell": 0, "Var": 0, "Display_data": {"all":0}, "max_indegree": 0, "max_outdegree": 0}
         for n in self.QueryGraph.nodes():
             indegree=0
             for i in self.QueryGraph.predecessors(n):
@@ -1615,7 +1615,7 @@ class WorkflowMatching:
                 if display_type not in self.query_workflow_info[node_type]:
                     self.query_workflow_info[node_type][display_type]=0
                 self.query_workflow_info[node_type][display_type]+=1
-                #self.query_workflow_info["Display_data"]["all"]+=1
+                self.query_workflow_info["Display_data"]["all"]+=1
                 continue
             self.query_workflow_info[node_type]+=1
 

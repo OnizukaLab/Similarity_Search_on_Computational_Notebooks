@@ -6,9 +6,9 @@ import json
 import os
 import timeit
 
-from django import http
+from django import http, forms
 from django.http.response import HttpResponse, HttpResponseRedirect
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import reverse
 from django.views import generic
 from django.utils import timezone
@@ -84,7 +84,7 @@ def get_db_graph2(wm):
 
     
 wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
-wm, G_in_this_nb = get_db_graph(wm)
+#wm, G_in_this_nb = get_db_graph(wm)
 
 
 
@@ -93,6 +93,8 @@ def index(request):
     return render(request, 'interface/index.html', {'w_C':0, 'w_D':0, 'w_L':0, 'w_O':0})
     #return HttpResponse("index page.")
 
+
+"""
 def search(request):
     try:
         arg_list={
@@ -111,9 +113,108 @@ def search(request):
     else:
         #return HttpResponseRedirect(reverse('interface:index', args=(w_C)))
         return render(request, 'interface/index.html', arg_list)
+"""
+
+def show_query_graph(request, *args, **kwargs):
+
+    wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
+    #wm.set_db_graph2(G_in_this_nb)
+    #wm, G_in_this_nb = get_db_graph(wm)
+    debug_data=""
+    debug_data=request.POST
+    request_data=request.POST
+    try:
+        arg_list={
+            'code_input_textarea0': request.POST['code_input_textarea0'],
+            'debug_data':request.POST
+        }
+    except:
+        pass
+    else:
+        pass
+
+    """
+    QueryGraph, query_root, query_lib, query_cell_code, query_table, node_id_to_node_name = build_QueryGraph_old()
+    wm.QueryGraph = QueryGraph
+    wm.query_root=query_root
+    wm.query_lib=query_lib
+    wm.query_cell_code=query_cell_code
+    wm.query_table=query_table
+    wm.attr_of_q_node_type = nx.get_node_attributes(wm.QueryGraph, "node_type")
+    wm.attr_of_q_real_cell_id=nx.get_node_attributes(wm.QueryGraph, "real_cell_id")
+    wm.attr_of_q_display_type=nx.get_node_attributes(wm.QueryGraph, "display_type")
+    #wm.query_workflow_info={"Cell": 3, "Var": 0, "Display_data": {"text": 1}, "max_indegree": 1, "max_outdegree": 1}
+    wm.set_query_workflow_info()
+    wm.set_query_workflow_info_Display_data()
+    """
+
+    wm, node_id_to_node_name = build_QueryGraph(wm)
+    #top_k_result, nb_score = search(wm, w_c=8, w_v=1, w_l=1, w_d=1, k=5)
+    node_object_list = QueryNode.objects.all()
+    return render(request, 'interface/querygraph.html', {'node_object_list': node_object_list, 'node_id_to_node_name': node_id_to_node_name, "debug_data":debug_data})
+
+def form(request, *args, **kwargs):
+
+    wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
+    #wm.set_db_graph2(G_in_this_nb)
+    #wm, G_in_this_nb = get_db_graph(wm)
+    debug_data=""
+    debug_data=request.POST
+    request_data=request.POST
+    node_object_list=[]
+    #for i in range(len(request_data["node_id"][0])):
+    #    #debug_data=str(len(request_data["node_id"]))
+    #    q = QueryNode(node_id=request_data["node_id"][i], node_type=request_data["node_type"][i], node_contents=request_data["node_contents"][i])
+    #    node_object_list.append(q)
+
+    wm, node_id_to_node_name = build_QueryGraph(wm)
+        
+    #top_k_result, nb_score = search(wm, w_c=8, w_v=1, w_l=1, w_d=1, k=5)
+
+    #node_object_list = QueryNode.objects.all()
+    return render(request, 'interface/querygraph.html', {'node_object_list': node_object_list, 'node_id_to_node_name': node_id_to_node_name, "debug_data":debug_data})
+
+def show_query_graph_redirect(request, *args, **kwargs):
+    wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
+    #wm.set_db_graph2(G_in_this_nb)
+    #wm, G_in_this_nb = get_db_graph(wm)
+    debug_data=""
+
+    try:
+        debug_data=request.POST
+        arg_list={
+            'code_input_textarea0': request.POST['code_input_textarea0'],
+            'debug_data':request.POST
+        }
+    except:
+        pass
+    else:
+        pass
+
+    """
+    QueryGraph, query_root, query_lib, query_cell_code, query_table, node_id_to_node_name = build_QueryGraph_old()
+    wm.QueryGraph = QueryGraph
+    wm.query_root=query_root
+    wm.query_lib=query_lib
+    wm.query_cell_code=query_cell_code
+    wm.query_table=query_table
+    wm.attr_of_q_node_type = nx.get_node_attributes(wm.QueryGraph, "node_type")
+    wm.attr_of_q_real_cell_id=nx.get_node_attributes(wm.QueryGraph, "real_cell_id")
+    wm.attr_of_q_display_type=nx.get_node_attributes(wm.QueryGraph, "display_type")
+    #wm.query_workflow_info={"Cell": 3, "Var": 0, "Display_data": {"text": 1}, "max_indegree": 1, "max_outdegree": 1}
+    wm.set_query_workflow_info()
+    wm.set_query_workflow_info_Display_data()
+    """
+    wm, node_id_to_node_name = build_QueryGraph(wm)
+        
+    #top_k_result, nb_score = search(wm, w_c=8, w_v=1, w_l=1, w_d=1, k=5)
+
+    node_object_list = QueryNode.objects.all()
+    # return redirect('querygraph.html', {'node_object_list': node_object_list, 'node_id_to_node_name': node_id_to_node_name, "debug_data":debug_data})
+    return HttpResponseRedirect(reverse('interface:show_query_graph', args=(request)))
 
 
-def show_query_graph(request):
+def result_old(request):
     """
     try:
         arg_list={
@@ -170,8 +271,37 @@ def show_query_graph(request):
     return HttpResponse(output)
 
 
+def result(request):
+    """
+    検索を行い，検索結果のページを出力する．
+    """
+    wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
+    wm.set_db_graph2(G_in_this_nb)
+    #wm, G_in_this_nb = get_db_graph(wm)
 
-def build_QueryGraph():
+    QueryGraph, query_root, query_lib, query_cell_code, query_table, node_id_to_node_name = build_QueryGraph()
+
+    wm.QueryGraph = QueryGraph
+    wm.query_root=query_root
+    wm.query_lib=query_lib
+    wm.query_cell_code=query_cell_code
+    wm.attr_of_q_node_type = nx.get_node_attributes(wm.QueryGraph, "node_type")
+    wm.attr_of_q_real_cell_id=nx.get_node_attributes(wm.QueryGraph, "real_cell_id")
+    wm.attr_of_q_display_type=nx.get_node_attributes(wm.QueryGraph, "display_type")
+    #wm.query_workflow_info={"Cell": 3, "Var": 0, "Display_data": {"text": 1}, "max_indegree": 1, "max_outdegree": 1}
+    wm.set_query_workflow_info()
+    wm.set_query_workflow_info_Display_data()
+        
+    top_k_result, nb_score = search(wm, w_c=8, w_v=1, w_l=1, w_d=1, k=5)
+
+    node_object_list = QueryNode.objects.all()
+    arranged_result = arrange_result_dict_for_html(jupyter_notebook_localhost_number, top_k_result, dict_nb_name_and_cleaned_nb_name)
+    return render(request, 'interface/result.html', {'node_object_list': node_object_list, 'node_id_to_node_name': node_id_to_node_name, 'arranged_result': arranged_result})
+
+def build_QueryGraph_old():
+    """
+    WorkflowMatchingのインスタンスを利用しない．
+    """
     QueryGraph = nx.DiGraph()
     node_object_list = QueryNode.objects.all()
     query_cell_code={}
@@ -230,6 +360,81 @@ def build_QueryGraph():
     logging.info("Completed!: Building a query graph.")
     return QueryGraph, query_root, query_lib, query_cell_code, query_table, node_id_to_node_name
 
+
+def build_QueryGraph(wm):
+    """
+    wm: WorkflowMatchingのインスタンス．
+    build_QueryGraph_oldと異なり，wmを引数として返り値もwm．
+    """
+    QueryGraph = nx.DiGraph()
+    node_object_list = QueryNode.objects.all()
+    query_cell_code={}
+    query_table={}
+
+    # ノード名設定用の変数3つ. int.
+    code_id=0
+    data_id=0
+    output_id=0
+
+    # edge設定用の{ノード番号:ノード名}の辞書. {int: string}.
+    node_id_to_node_name={}
+
+    for node in node_object_list:
+        if node.node_type=="code":
+            node_name = f"cell_query_{code_id}"
+            QueryGraph.add_node(node_name, node_type="Cell", node_id=f"{node.node_id}")
+            query_cell_code[node_name] = node.node_contents
+            node_id_to_node_name[node.node_id]=node_name
+            code_id+=1
+        elif node.node_type=="data":
+            node_name = f"query_var{data_id}"
+            QueryGraph.add_node(node_name, node_type="Var", node_id=f"{node.node_id}")
+            query_table[node_name] = node.node_contents
+            node_id_to_node_name[node.node_id]=node_name
+            data_id+=1
+        elif node.node_type=="output":
+            # TODO:display_type="text"を正しい内容に変更．
+            node_name = f"query_display{data_id}"
+            QueryGraph.add_node(node_name, node_type="Display_data", display_type="text", node_id=f"{node.node_id}")
+            node_id_to_node_name[node.node_id]=node_name
+            output_id+=1
+        logging.info(f"{node_name} appended to QueryGraph.")
+    
+    library_list=[]
+    for library in QueryLibrary.objects.all():
+        library_list.append(library.library_name)
+    query_lib=pd.Series(library_list)
+    
+    for edge in QueryEdge.objects.all():
+        QueryGraph.add_edge(node_id_to_node_name[edge.parent_node_id], node_id_to_node_name[edge.successor_node_id])
+
+    query_root=None
+    root_count=0
+    for n in QueryGraph.nodes():
+        if len(list(QueryGraph.predecessors(n)))==0:
+            logging.info(f"{n} is root node.")
+            query_root = n
+            root_count+=1
+            #break
+        #logging.info(f"{n} is not root node.")
+    if root_count>1:
+        print("Only a node is allowed in query graph.")
+        sys.exit(1)
+    
+    wm.QueryGraph = QueryGraph
+    wm.query_root=query_root
+    wm.query_lib=query_lib
+    wm.query_cell_code=query_cell_code
+    wm.query_table=query_table
+    wm.attr_of_q_node_type = nx.get_node_attributes(wm.QueryGraph, "node_type")
+    wm.attr_of_q_real_cell_id=nx.get_node_attributes(wm.QueryGraph, "real_cell_id")
+    wm.attr_of_q_display_type=nx.get_node_attributes(wm.QueryGraph, "display_type")
+    #wm.query_workflow_info={"Cell": 3, "Var": 0, "Display_data": {"text": 1}, "max_indegree": 1, "max_outdegree": 1}
+    wm.set_query_workflow_info()
+    wm.set_query_workflow_info_Display_data()
+
+    logging.info("Completed!: Building a query graph.")
+    return wm, node_id_to_node_name
 
 def dump_to_json(QueryNode_object_list, QueryEdge_object_list, QueryLibrary_object_list):
     """
@@ -388,3 +593,35 @@ def searching_top_k_notebooks(wm, w_c, w_v, w_l, w_d, k, flg_chk_invalid_by_work
             f.write(json.dumps(wm.nb_score))
         
     return top_k_result, wm.nb_score
+
+
+def create_jupyter_url(jupyter_notebook_localhost_number, nb_name):
+    created_url = f"http://localhost:{jupyter_notebook_localhost_number}/notebooks/{nb_name}"
+    return created_url
+
+def arrange_result_dict_for_html(jupyter_notebook_localhost_number, top_k_result, dict_nb_name_and_cleaned_nb_name):
+    arranged_result = []
+    for result in top_k_result:
+        nb_name = dict_nb_name_and_cleaned_nb_name[result[0]]
+        nb_score = result[1]
+        nb_url = create_jupyter_url(jupyter_notebook_localhost_number, nb_name)
+        arranged_result.append([nb_name, nb_score, nb_url])
+    return arranged_result
+
+def make_test_formset(request):
+    TestFormSet = forms.formset_factory(
+            form=QueryNode,
+            extra=3,     # default-> 1
+            max_num=4    # initial含めformは最大4となる
+    )
+    # 通常のformと同様に処理できる。
+    if request.method == 'POST':
+        formset = TestFormSet(request.POST)
+        if formset.is_valid():
+            # 参考として,cleaned_dataの中身を表示してみます。          
+            data = repr(formset.cleaned_data)
+            return HttpResponse(data) 
+    else:
+        formset = TestFormSet() # initialを渡すことができます。
+        # formset = TestFormSet(initial=[{'title':'abc', 'date': '2019-01-01'},])
+    return render(request, 'interface/form1.html', {'formset': formset})

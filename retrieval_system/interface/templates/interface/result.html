@@ -1,0 +1,32 @@
+{# requirements
+    node_object_list
+    node_id_to_node_name
+    top_k_result
+    #}
+{% extends "layout.html" %}
+{% block content %}
+
+{# output = '<br>'.join([node.node_contents for node in node_object_list]) #}
+{% for node in node_object_list %}
+{{ node.node_contents }}
+<br/>
+{% endfor %}
+
+{# output += '<br><br>*** Graph\'s Information ***<br>' + '<br>'.join([f"{node_name} ----- {node_id}" for node_id, node_name in node_id_to_node_name.items()]) #}
+*** Graph's Information ***
+<br/>
+{% for node_id, node_name in node_id_to_node_name.items() %}
+{{ node_name }} ----- {{ node_id }}
+<br/>
+{% endfor %}
+
+{# output += '<br><br>*** Result ***<br>' + '<br>'.join([f"{items[0]}, {items[1]}" for items in arranged_result]) #}
+*** Result ***
+<br/>
+{% for items in arranged_result %}
+{{ dict_nb_name_and_cleaned_nb_name[items[0]] }}, {{ items[1] }}
+<br/>
+{% endfor %}
+
+
+{% endblock %}

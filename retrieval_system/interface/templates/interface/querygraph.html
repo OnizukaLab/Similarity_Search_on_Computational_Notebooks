@@ -1,0 +1,338 @@
+{% load static%}
+<!doctype html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Cache-Control" content="no-cache">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" type="text/css" href="{% static 'interface/css/style.css' %}">
+
+  <style>
+    /* CSS設定 */
+    .tooltip {
+      position: absolute;
+      text-align: left;
+      width: auto;
+      height: auto;
+      padding: 5px;
+      font: 12px;
+      background: white;
+      -webkit-box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.8);
+      -moz-box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.8);
+      box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.8);
+      visibility: hidden;
+    }
+
+    form {
+      visibility: visible;
+      border : solid 1px #333 ;
+    }
+
+    .inner{
+        margin: auto;
+        width: 90%;
+        border : solid 1px #333 ;
+    }
+   
+
+    .wrapper {
+        margin: auto;
+        display: table;
+        height: 100%;
+        width: 100%;
+        min-width: 400px;
+        border : solid 1px #333 ;
+    }
+    .my_color{
+        width: 100%;
+        border : solid 1px #333 ;
+    }
+
+    .column {
+        vertical-align: top;
+        height: 100%;
+        width: 50%;
+        display: table-cell;
+        border : solid 1px #333 ;
+    }
+
+    .cat1 {
+        text-align: center;
+        position: relative;
+        border : solid 1px black ;
+    }
+
+    .cat2 {
+        position: relative;
+        border : solid 1px red ;
+    }
+
+    .input_form {
+        width: 100%;
+        height: 100%;
+        border : solid 1px blue ;
+    }
+
+
+
+
+    </style>
+</head>
+<body>
+    <script src="https://d3js.org/d3.v5.js"></script>
+    <script src="{% static 'interface/javascript/style.js' %}"></script>
+
+<div class="inner">
+
+{# output = '<br>'.join([node.node_contents for node in node_object_list]) #}
+{% for node in node_object_list %}
+{{ node.node_contents }}
+<br/>
+{% endfor %}
+
+
+{# output += '<br><br>*** Graph\'s Information ***<br>' + '<br>'.join([f"{node_name} ----- {node_id}" for node_id, node_name in node_id_to_node_name.items()]) #}
+*** Graph's Information ***
+<br/>
+{% for node_id, node_name in node_id_to_node_name.items %}
+{{ node_name }} ----- {{ node_id }}
+<br/>
+{% endfor %}
+
+
+<div class="my_color">
+---- Query Graph ----
+<form method="POST" id="myform">
+    {% csrf_token %}
+    {{ form.management_form }}
+    <div class="text">
+        {{ form.empty_form.as_p }}
+    </div>
+    <button type="button" id="btn-clone">clone</button>
+    <button type="submit">submit</button>
+</form>
+<form method="post">
+    {% csrf_token %}
+    {{ formset }}
+    <button type="submit">submit</button>
+</form>
+</div>
+
+
+<div class="wrapper">
+
+<div class="column cat1">
+    <div id="my_dataviz"></div>
+    <div id="my_dataviz2"></div>
+</div>
+
+<div class="column cat2">
+    <div class="input_form">
+        <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+        <input type="submit" name="submit_button" value="submit"> 
+        <br/>
+        {% for node in node_object_list %}
+            {% csrf_token %}
+            <label>node id: </label>
+            <input type="text" name="node_id" value={{ node.node_id }} class="input_form3">
+            <br/>
+            <label>node type: </label>
+            <input type="text" name="node_type" value={{ node.node_type }} class="input_form3">
+            <br/>
+node_contents:
+            <br/>
+            <textarea name="node_contents" value="value"+{{ node.node_id }} cols="50" rows="10" class="input_form3">{{ node.node_contents }}</textarea>
+            <br/>
+        {% endfor %}
+        </form>
+    </div>
+</div>
+
+</div>
+
+
+<div class = "for_debug">
+    <p>
+    debug: <br/>
+    {{debug_data}}
+    </p>
+</div>
+
+</div>
+
+
+
+
+
+<script>
+$(function() {
+
+
+// clone
+$('#btn-clone').click(function() {
+    var text = $('.text').last();  // 最後尾にあるinput
+    clone = text.clone().insertAfter(text);  // inputを最後尾に追加
+    clone.find("input[type='text']").val('');  // valueもクローンされるので削除する
+});
+
+
+// ここからDjango用のidなどを操作する
+$('#myform').submit(function() {  // フォームを送信する直前
+
+    // フォームの入力欄の数を指定する
+    const text = $('.text');
+    $('[name=form-TOTAL_FORMS]').val(text.length);
+
+    // それぞれの入力欄の__prefix__をindexで置換する
+    text.each(function(index, element){
+        html = $(element).html().replace(/__prefix__/g, index);
+        value = $(element).find("input[type='text']").val();  // valueが消えるので保存しておく
+        $(element).html(html);
+        $(element).find("input[type='text']").val(value);
+    });
+
+});
+});
+
+
+createsvg();
+// 参考：https://qiita.com/daxanya1/items/734e65a7ca58bbe2a98c
+// id:exampleが指定されているタグ(ここではdivタグ)の下に、svgを追加します。
+// widthとheightを指定します。
+function createsvg () {
+    // nodeの半径
+    var node_r = 20;
+    // nodeの色設定
+    var node_color_fill = "#19d3a2";
+    var node_color_stroke = "#b3a2c8";
+    var node_fill_opacity = 0.3;
+    var node_stroke_width = 4;
+
+    // テスト用データ
+    var node = [{'node_id':0, 'node_type':'code', 'node_contents':'code0'}, {'node_id':1, 'node_type':'code', 'node_contents':'code1'}, {'node_id':2, 'node_type':'code', 'node_contents':'code2'}, {'node_id':3, 'node_type':'code', 'node_contents':'code3'}];
+    var edge_dict = [{'parent_node_id':0, 'successor_node_id':1}, {'parent_node_id':1, 'successor_node_id':2}];
+    var root_node_id = 0;
+
+    //初期化
+    var edge = {};
+    var node_positions = {}
+
+    for(let i=0;i<edge.length;i++){
+        j = edge_dict["parent_node_id"];
+        k = edge_dict["successor_node_id"];
+        if(!(j in edge)){
+            edge[j] = [];
+        }
+        edge[j].push(k);
+    }
+    var node_num = node.length
+    var data = [];
+    var tmp_node_id;
+    for (let i=0; i<node_num; i++){
+        tmp_node_id = node[i].node_id;
+        node_positions[tmp_node_id] = [100, 100*(i+1), node_r];
+        data.push([100, 100*(i+1), 20, node[i], edge[tmp_node_id]]);
+    }
+
+
+
+
+    var tooltip = d3.select("body").append("div").attr("class", "tooltip");
+    var tmp_node_id;
+    var id_name;
+
+    /*
+    var code_input_textarea=document.getElementsByClassName("input_form3")
+    for (let i=0; i<code_input_textarea.length; i++){
+        code_input_textarea[i].setAttribute("name", "node_id_"+node[i].node_id);
+        code_input_textarea[i].setAttribute("id", "code_input_textarea"+node[i].node_id);
+    }
+    */
+    
+
+    var svg = d3.select("#my_dataviz")
+        .append("svg")
+        .attr("height", 480);
+    
+    // circle要素とtext要素をgという要素でまとめる
+    var g = svg.selectAll('g')
+        .data(data).enter().append('g')
+        .attr('transform', function(d) { return "translate(" + d[0] + "," + d[1] + ")"; });
+
+
+    g.append('circle')
+        //.attr("cx", function(d) { return d[0]; })
+        //.attr("cy", function(d) { return d[1]; }) 
+        .attr("r", function(d) { return d[2]; })
+        .style("fill", node_color_fill)
+        .style("fill-opacity", node_fill_opacity)
+        .attr("stroke", node_color_stroke)
+        .style("stroke-width", node_stroke_width)
+        .on("mouseover", function(d) {
+            tooltip
+                .style("visibility", "visible")
+                .html("node id : " + d[3].node_id + "<br>node type : " + d[3].node_type + "<br>node contents : " + d[3].node_contents + "<br>successor_node : " + JSON.stringify(d[4]));
+                //.html("node : " + JSON.stringify(d[3]) + "<br>successor_node : " + JSON.stringify(d[4]));
+            })
+        .on("mousemove", function(d) {
+            tooltip
+                .style("top", (d3.event.pageY - 20) + "px")
+                .style("left", (d3.event.pageX + 10) + "px");
+            })
+        .on("mouseout", function(d) {
+            tooltip.style("visibility", "hidden");
+            })
+        .on("mousedown", function(d) { 
+            code_input_textarea[d[3].node_id].style.visibility = "visible";
+            var new_node = d3.select("body").append("div").attr("class", "input_form2");
+            new_node
+                .style("top", (d3.event.pageY - 20) + "px")
+                .style("left", (d3.event.pageX + 10) + "px");
+            d3.select(this)
+                .attr("fill", "blue")
+                .attr("stroke", "green");
+            })
+        .on("mouseup", function() { 
+            d3.select(this)
+                .attr("fill", node_color_fill)
+                .attr("stroke", node_color_stroke);
+            });
+
+    g.append('text')
+        .attr('text-anchor', "middle")
+        .attr('dy', ".35em")
+        .attr('fill', "white")
+        .text(function(d,i) { return i+1; });
+
+    //var interpolateTypes = [d3.curveLinear,d3.curveStepBefore,d3.curveStepAfter,d3.curveBasis,d3.curveBasisOpen, d3.curveBasisClosed, d3.curveBundle,d3.curveCardinal,d3.curveCardinal,d3.curveCardinalOpen,d3.curveCardinalClosed,d3.curveNatural];
+    //var interpolateNames = ['d3.curveLinear','d3.curveStepBefore','d3.curveStepAfter','d3.curveBasis','d3.curveBasisOpen', 'd3.curveBasisClosed', 'd3.curveBundle','d3.curveCardinal','d3.curveCardinal','d3.curveCardinalOpen','d3.curveCardinalClosed','d3.curveNatural'];
+
+    var line = d3.line()
+        // curve指定で点のつなぎ方を指定する
+        // https://github.com/d3/d3-shape/blob/master/README.md#line_curve
+        // バージョン3の場合はinterpolateで指定する
+        // basisで滑らかにできる
+        //.curve(d3.curveBasis)
+        .x(function(d) {return d[0];})
+        .y(function(d) {return d[1];});
+
+
+    var path = svg.append('path')
+        .attr('d', line(data))
+        .attr('stroke', 'lightgreen')
+        .attr('stroke-width', 5)
+        .attr('fill', 'none');
+        //.attr('marker-end', "url(#arrowhead)");
+        //.attr('arrowMarkerAbsolute', true);
+
+
+};
+
+</script>
+
+
+
+
+
+</body>
+</html>
