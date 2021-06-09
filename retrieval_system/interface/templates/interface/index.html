@@ -1,114 +1,75 @@
-{% load static%}
+{% load static %}
 <!doctype html>
 <html>
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="Cache-Control" content="no-cache">
-    <title>{{ title }}</title>
     <link rel="stylesheet" type="text/css" href="{% static 'interface/css/style.css' %}">
-
-  <style>
-    /* CSS設定 */
+    <title>{{ title }}</title>
+</head>
+<body>
+<script type="text/css">
     body{
         background-color: white;
         font-family: "Helvetica Neue","Segoe UI", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
         word-wrap: break-word;
     }
     
-    #input_plural {
-        margin: 10px 0;
-    }
-    
-    #input_plural input.form-control {
-        display: inline-block;
-        width: 75%;
-        height: 34px;
-        padding: 6px 12px;
-        font-size: 14px;
-        color: #555;
-    }
-    
-    #input_plural input.pluralBtn {
-        width: 30px;
-        height: 30px;
-        border: 1px solid #ccc;
-        background: #fff;
-        border-radius: 5px;
-        padding: 0;
-        margin: 0;
-    }
-    .box_1{
-        background-color: white;
-        width: 80%;
-        margin: 0 auto;
-        max-width: 1200px;
-    }
-    .box_1 h1{
-        background-color: rgb(143, 177, 189);
-    }
-
-    .box_2{
-        background-color: white;
-        width: 80%;
-        margin: 0 auto;
-        max-width: 1200px;
-    }
-
-    .for_debug{
-        background-color: rgb(143, 177, 189);
-        width: 80%;
-        margin: 0 auto;
-        max-width: 1200px;
-    }
-
-    .weight{
-        width: 15px;
-    }
-
-    .text_input{
-        width: 500px;
-        height: 250px;
-    }
-
-    .input_form{
-        width: 95%;
-        margin: 0 auto;
-    }
-
-    .my_color {
-        color: green;
-    }
-
-    .tooltip {
-      position: absolute;
-      text-align: left;
-      width: auto;
-      height: auto;
-      padding: 5px;
-      font: 12px;
-      background: white;
-      -webkit-box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.8);
-      -moz-box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.8);
-      box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.8);
-      visibility: hidden;
-    }
-
     header{
         display: block;
         height: 72px;
         border: none;
     }
-
-    form {
-      visibility: visible;
+    
+    .hero-header{
+        padding: 2.0rem 0 2.0rem; 
+        border-bottom: 1px solid #55575a;
     }
-
+    
+    .hero-header_visual{
+        text-align: center;
+    }
+    
+    form {
+        visibility: visible;
+    }
+    
+    
+    .for_debug{
+        background-color: rgb(143, 177, 189);
+    }
+    
+    .input_form{
+        width: 95%;
+        margin: 0 auto;
+    }
+    
+    .tooltip {
+        position: absolute;
+        text-align: left;
+        width: auto;
+        height: auto;
+        padding: 5px;
+        font: 12px;
+        background: white;
+        -webkit-box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.8);
+        -moz-box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.8);
+        box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.8);
+        visibility: hidden;
+    }
+    
+    
+    .wrap{
+        margin: auto;
+        width: 90%;
+    }
+    
     .inner{
         margin: auto;
         width: 90%;
     }
-   
-
+    
+    
     .wrapper {
         margin: auto;
         display: table;
@@ -116,28 +77,24 @@
         width: 100%;
         min-width: 400px;
     }
-    .my_color{
-        width: 100%;
-        border : solid 1px #333 ;
-    }
-
+    
     .column {
         vertical-align: top;
         height: 100%;
         width: 50%;
         display: table-cell;
-        border : solid 1px #333 ;
+        border : none;
     }
-
+    
     .cat1 {
         text-align: center;
         position: relative;
     }
-
+    
     .cat2 {
         position: relative;
     }
-
+    
     .input_form {
         width: 95%;
         height: 100%;
@@ -145,7 +102,7 @@
     .input_form2{
         border : solid 1px #333 ;
     }
-
+    
     .search_button{
         border: 1px solid orange;
         border-radius: 5px;
@@ -155,158 +112,158 @@
         color: white;
         width: 250px;
     }
+    
+</script>
+<script src="https://d3js.org/d3.v5.js"></script>
+<script src="{% static 'interface/javascript/style.js' %}"></script>
 
 
 
 
-    </style>
-</head>
-<body>
-    <script src="https://d3js.org/d3.v5.js"></script>
-    <script src="{% static 'interface/javascript/style.js' %}"></script>
-
-
-
-
-<div class="inner">
-
-<header id="header" class="header"></header>
-
-<div class="my_color">
-Similarity Search for Jupyter Notebook
-<br/>
-</div>
-
-
-<div class="wrapper">
-
-<div class="column cat1">
-    <div id="my_dataviz"></div>
-</div>
-
-<div class="column cat2">
-    <div class="input_form">
-        <br/>
-        <form action="{% url 'interface:result' %}" method='POST'>
-            {% csrf_token %}
-            <input class="search_button" type="submit" name="search_button" value="SEARCH"> 
-        </form>
-        <br/>
-
-        <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
-            {% csrf_token %}
-            Save a query.
-            <br/>
-            <label>Query name: </label>
-            <input type="text" name="query_name" id="query_name" value="Enter a query name">
-            <br/>
-            <input type="submit" name="saving_button" value="Save"> 
-            <br/>
-        </form>
-        <br/>
-
-        <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
-            {% csrf_token %}
-            Load a query.
-            {{ form_setting_query.as_p }}
-            <input type="submit" name="loading_button" value="Load"> 
-        </form>
-        <br/>
-
-        <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
-            {% csrf_token %}
-            <br/>
-            Configure each weight.
-            <br/>
-            <label>code: </label>
-            <input type="range" id="code_weight" name="code_weight" min="0" max="10" step="0.5" value={{code_weight}}>
-            <span id="current-code_weight">{{code_weight}}</span>
-            <br/>
-            <label>data: </label>
-            <input type="range" id="data_weight" name="data_weight" min="0" max="10" step="0.5" value={{data_weight}}>
-            <span id="current-data_weight">{{data_weight}}</span>
-            <br/>
-            <label>library: </label>
-            <input type="range" id="library_weight" name="library_weight" min="0" max="10" step="0.5" value={{library_weight}}>
-            <span id="current-library_weight">{{library_weight}}</span>
-            <br/>
-            <label>output's form: </label>
-            <input type="range" id="output_weight" name="output_weight" min="0" max="10" step="0.5" value={{output_weight}}>
-            <span id="current-output_weight">{{output_weight}}</span>
-            <br/>
-            <input type="submit" name="setting_weight_button" value="Set"> 
-            <br/>
-        </form>
-
-        <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
-            {% csrf_token %}
-            Configure libraries.
-            <br/>
-            <p>Copy and paste source code with importing library</p>>
-            <textarea name="input_node_contents" id="libraries_contents" value="" cols="50" rows="10"></textarea>
-            <br/>
-            <input type="submit" name="setting_button" value="Set"> 
-            <br/>
-        </form>
-
-        <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
-            {% csrf_token %}
-            Configure a node.
-            <br/>
-            {{ form_setting_node.as_p }}
-            {{ form_setting_type.as_p }}
-            <br/>
-node contents:
-            <br/>
-            <textarea name="input_node_contents" id="input_node_contents" value="" cols="50" rows="10"></textarea>
-            <br/>
-            <input type="submit" name="setting_button" value="Set"> 
-            <br/>
-        </form>
-
-        <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
-            {% csrf_token %}
-            Add an edge.
-            <br/>
-            <label>parent node : </label>
-            {{ form_setting_node.as_p }}
-            <br/>
-            <label>successor node: </label>
-            {{ form_setting_node.as_p }}
-            <br/>
-            <input type="submit" name="setting_button" value="Add"> 
-            <br/>
-        </form>
-        <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
-            {% csrf_token %}
-            Delete an edge.
-            <br/>
-            {{ form_delete_edge.as_p }}
-            <input type="submit" name="setting_button" value="Delete"> 
-        </form>
-
-
+<div class="hero-header">
+    <div class="wrap">
+        <h1 class="hero-header_visual">
+            <p>Similarity Search for Jupyter Notebook</p>
+        </h1>
     </div>
 </div>
 
-</div>
+<div class="contents">
+    <div class="wrap">
+        <div class="wrapper">
+
+            <div class="column cat1">
+                <div id="my_dataviz"></div>
+            </div>
+
+            <div class="column cat2">
+                <div class="input_form">
+                    <br/>
+                    <div class="wrap">
+                    <form action="{% url 'interface:result' %}" method='POST'>
+                        {% csrf_token %}
+                        <input class="search_button" type="submit" name="search_button" value="SEARCH"> 
+                    </form>
+                    <br/>
+                    </div>
+
+                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+                        {% csrf_token %}
+                        Save a query.
+                        <br/>
+                        <label>Query name: </label>
+                        <input type="text" name="query_name" id="query_name" value="Enter a query name">
+                        <br/>
+                        <input type="submit" name="saving_button" value="Save"> 
+                        <br/>
+                    </form>
+                    <br/>
+
+                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+                        {% csrf_token %}
+                        Load a query.
+                        {{ form_setting_query.as_p }}
+                        <input type="submit" name="loading_button" value="Load"> 
+                    </form>
+                    <br/>
+
+                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+                        {% csrf_token %}
+                        <br/>
+                        Configure each weight.
+                        <br/>
+                        <label>code: </label>
+                        <input type="range" id="code_weight" name="code_weight" min="0" max="10" step="0.5" value={{code_weight}}>
+                        <span id="current-code_weight">{{code_weight}}</span>
+                        <br/>
+                        <label>data: </label>
+                        <input type="range" id="data_weight" name="data_weight" min="0" max="10" step="0.5" value={{data_weight}}>
+                        <span id="current-data_weight">{{data_weight}}</span>
+                        <br/>
+                        <label>library: </label>
+                        <input type="range" id="library_weight" name="library_weight" min="0" max="10" step="0.5" value={{library_weight}}>
+                        <span id="current-library_weight">{{library_weight}}</span>
+                        <br/>
+                        <label>output's form: </label>
+                        <input type="range" id="output_weight" name="output_weight" min="0" max="10" step="0.5" value={{output_weight}}>
+                        <span id="current-output_weight">{{output_weight}}</span>
+                        <br/>
+                        <input type="submit" name="setting_weight_button" value="Set"> 
+                        <br/>
+                    </form>
+
+                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+                        {% csrf_token %}
+                        Configure libraries.
+                        <br/>
+                        <p>Copy and paste source code with importing library</p>>
+                        <textarea name="input_node_contents" id="libraries_contents" value="" cols="50" rows="10"></textarea>
+                        <br/>
+                        <input type="submit" name="setting_button" value="Set"> 
+                        <br/>
+                    </form>
+
+                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+                        {% csrf_token %}
+                        Configure a node.
+                        <br/>
+                        {{ form_setting_node.as_p }}
+                        {{ form_setting_type.as_p }}
+                        <br/>
+            node contents:
+                        <br/>
+                        <textarea name="input_node_contents" id="input_node_contents" value="" cols="50" rows="10"></textarea>
+                        <br/>
+                        <input type="submit" name="setting_button" value="Set"> 
+                        <br/>
+                    </form>
+
+                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+                        {% csrf_token %}
+                        Add an edge.
+                        <br/>
+                        <label>parent node : </label>
+                        {{ form_setting_node.as_p }}
+                        <br/>
+                        <label>successor node: </label>
+                        {{ form_setting_node.as_p }}
+                        <br/>
+                        <input type="submit" name="setting_button" value="Add"> 
+                        <br/>
+                    </form>
+                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+                        {% csrf_token %}
+                        Delete an edge.
+                        <br/>
+                        {{ form_delete_edge.as_p }}
+                        <input type="submit" name="setting_button" value="Delete"> 
+                    </form>
 
 
-<div class="result">
+                </div>
+            </div>
 
-    {# output += '<br><br>*** Result ***<br>' + '<br>'.join([f"{items[0]}, {items[1]}" for items in arranged_result]) #}
-    *** Result ***
-    <br/>
-    
-    {{arranged_result}}
-    
-</div>
-<div class = "for_debug">
-    <p>
-    debug: <br/>
-    {{debug_data}}
-    </p>
-</div>
+        </div>
+    </div>
+
+
+    <div class="wrap">
+        <div class="result">
+
+        {# output += '<br><br>*** Result ***<br>' + '<br>'.join([f"{items[0]}, {items[1]}" for items in arranged_result]) #}
+        *** Result ***
+        <br/>
+        
+        {{arranged_result}}
+        </div>
+    </div>
+
+
+    <div class="wrap">
+        <div class = "for_debug">
+            <p>debug: <br/>{{debug_data}}</p>
+        </div>
+    </div>
 
 </div>
 
