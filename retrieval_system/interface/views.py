@@ -237,16 +237,29 @@ def form(request, *args, **kwargs):
         new_node = QueryNode(node_id=node_id, node_type=node_type, node_contents=node_contents)
         QueryNode.objects.filter(node_id=node_id).delete()
         new_node.save()
-    try:
-        code_weight=int(request_data["code_weight"])
-        data_weight=int(request_data["data_weight"])
-        library_weight=int(request_data["library_weight"])
-        output_weight=int(request_data["output_weight"])
-    except:
-        code_weight=1
-        data_weight=1
-        library_weight=1
-        output_weight=1
+    if "setting_weight_button" in request_data:
+        try:
+            code_weight=float(request_data["code_weight"])
+        except:
+            code_weight=1.
+        try:
+            data_weight=float(request_data["data_weight"])
+        except:
+            data_weight=1.
+        try:
+            library_weight=float(request_data["library_weight"])
+        except:
+            library_weight=1.
+        try:
+            output_weight=float(request_data["output_weight"])
+        except:
+            output_weight=1.
+    else:
+        code_weight=1.
+        data_weight=1.
+        library_weight=1.
+        output_weight=1.
+
     try:
         parent_node_id = int(request_data["input_parent_node_id"])
         successor_node_id = int(request_data["input_successor_node_id"])

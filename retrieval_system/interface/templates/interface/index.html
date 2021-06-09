@@ -9,6 +9,76 @@
 
   <style>
     /* CSS設定 */
+    body{
+        background-color: white;
+        font-family: "Helvetica Neue","Segoe UI", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+        word-wrap: break-word;
+    }
+    
+    #input_plural {
+        margin: 10px 0;
+    }
+    
+    #input_plural input.form-control {
+        display: inline-block;
+        width: 75%;
+        height: 34px;
+        padding: 6px 12px;
+        font-size: 14px;
+        color: #555;
+    }
+    
+    #input_plural input.pluralBtn {
+        width: 30px;
+        height: 30px;
+        border: 1px solid #ccc;
+        background: #fff;
+        border-radius: 5px;
+        padding: 0;
+        margin: 0;
+    }
+    .box_1{
+        background-color: white;
+        width: 80%;
+        margin: 0 auto;
+        max-width: 1200px;
+    }
+    .box_1 h1{
+        background-color: rgb(143, 177, 189);
+    }
+
+    .box_2{
+        background-color: white;
+        width: 80%;
+        margin: 0 auto;
+        max-width: 1200px;
+    }
+
+    .for_debug{
+        background-color: rgb(143, 177, 189);
+        width: 80%;
+        margin: 0 auto;
+        max-width: 1200px;
+    }
+
+    .weight{
+        width: 15px;
+    }
+
+    .text_input{
+        width: 500px;
+        height: 250px;
+    }
+
+    .input_form{
+        width: 95%;
+        margin: 0 auto;
+    }
+
+    .my_color {
+        color: green;
+    }
+
     .tooltip {
       position: absolute;
       text-align: left;
@@ -23,6 +93,12 @@
       visibility: hidden;
     }
 
+    header{
+        display: block;
+        height: 72px;
+        border: none;
+    }
+
     form {
       visibility: visible;
     }
@@ -30,7 +106,6 @@
     .inner{
         margin: auto;
         width: 90%;
-        border : solid 1px #333 ;
     }
    
 
@@ -90,12 +165,16 @@
     <script src="https://d3js.org/d3.v5.js"></script>
     <script src="{% static 'interface/javascript/style.js' %}"></script>
 
+
+
+
 <div class="inner">
 
-
+<header id="header" class="header"></header>
 
 <div class="my_color">
 Similarity Search for Jupyter Notebook
+<br/>
 </div>
 
 
@@ -124,6 +203,7 @@ Similarity Search for Jupyter Notebook
             <input type="submit" name="saving_button" value="Save"> 
             <br/>
         </form>
+        <br/>
 
         <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
             {% csrf_token %}
@@ -139,16 +219,31 @@ Similarity Search for Jupyter Notebook
             Configure each weight.
             <br/>
             <label>code: </label>
-            <input type="range" id="code_weight" min="0" max="10" step="0.1" value={{code_weight}}>
+            <input type="range" id="code_weight" name="code_weight" min="0" max="10" step="0.5" value={{code_weight}}>
+            <span id="current-code_weight">{{code_weight}}</span>
             <br/>
             <label>data: </label>
-            <input type="range" id="data_weight" min="0" max="10" step="0.1" value={{data_weight}}>
+            <input type="range" id="data_weight" name="data_weight" min="0" max="10" step="0.5" value={{data_weight}}>
+            <span id="current-data_weight">{{data_weight}}</span>
             <br/>
             <label>library: </label>
-            <input type="range" id="library_weight" min="0" max="10" step="0.1" value={{library_weight}}>
+            <input type="range" id="library_weight" name="library_weight" min="0" max="10" step="0.5" value={{library_weight}}>
+            <span id="current-library_weight">{{library_weight}}</span>
             <br/>
             <label>output's form: </label>
-            <input type="range" id="output_weight" min="0" max="10" step="0.1" value={{output_weight}}>
+            <input type="range" id="output_weight" name="output_weight" min="0" max="10" step="0.5" value={{output_weight}}>
+            <span id="current-output_weight">{{output_weight}}</span>
+            <br/>
+            <input type="submit" name="setting_weight_button" value="Set"> 
+            <br/>
+        </form>
+
+        <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+            {% csrf_token %}
+            Configure libraries.
+            <br/>
+            <p>Copy and paste source code with importing library</p>>
+            <textarea name="input_node_contents" id="libraries_contents" value="" cols="50" rows="10"></textarea>
             <br/>
             <input type="submit" name="setting_button" value="Set"> 
             <br/>
@@ -221,6 +316,95 @@ node contents:
 
 <script>
 const TOOLTIP_MAX_TEXT_LENGTH=300;
+
+var inputElem = document.getElementById('code_weight'); // input要素
+var currentValueElem = document.getElementById('current-code_weight'); // 埋め込む先のspan要素
+var inputElem2 = document.getElementById('data_weight'); // input要素
+var currentValueElem2 = document.getElementById('current-data_weight'); // 埋め込む先のspan要素
+var inputElem3 = document.getElementById('library_weight'); // input要素
+var currentValueElem3 = document.getElementById('current-library_weight'); // 埋め込む先のspan要素
+var inputElem4 = document.getElementById('output_weight'); // input要素
+var currentValueElem4 = document.getElementById('current-output_weight'); // 埋め込む先のspan要素
+
+// 現在の値をspanに埋め込む関数
+var setCurrentValue = (val) => {
+    currentValueElem.innerText = val;
+}
+var setCurrentValue2 = (val) => {
+    currentValueElem2.innerText = val;
+}
+var setCurrentValue3 = (val) => {
+    currentValueElem3.innerText = val;
+}
+var setCurrentValue4 = (val) => {
+    currentValueElem4.innerText = val;
+}
+
+// inputイベント時に値をセットする関数
+var rangeOnChange = (e) =>{
+  setCurrentValue(e.target.value);
+}
+var rangeOnChange2 = (e) =>{
+  setCurrentValue2(e.target.value);
+}
+var rangeOnChange3 = (e) =>{
+  setCurrentValue3(e.target.value);
+}
+var rangeOnChange4 = (e) =>{
+  setCurrentValue4(e.target.value);
+}
+
+window.onload = () => {
+  inputElem.addEventListener('input', rangeOnChange); // スライダー変化時にイベントを発火
+  setCurrentValue(inputElem.value); // ページ読み込み時に値をセット
+  inputElem2.addEventListener('input', rangeOnChange2);
+  setCurrentValue2(inputElem2.value);
+  inputElem3.addEventListener('input', rangeOnChange3);
+  setCurrentValue3(inputElem3.value);
+  inputElem4.addEventListener('input', rangeOnChange4);
+  setCurrentValue4(inputElem4.value);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+var elem = [];
+elem.push((document.getElementById('code_weight'), document.getElementById('current-code_weight')));
+//elem.push((document.getElementById('data_weight'), document.getElementById('current-data_weight')));
+//elem.push((document.getElementById('library_weight'), document.getElementById('current-library_weight')));
+//elem.push((document.getElementById('output_weight'), document.getElementById('current-output_weight')));
+//var elem = document.getElementsByClassName('range');
+var rangeValue = function (elem, target) {
+    return function(evt){
+        target.innerHTML = elem.value;
+    }
+}
+window.onload = () => {
+for(var i = 0, max = elem.length; i < max; i++){
+    //bar = elem[i].getElementsByTagName('input')[0];
+    //target = elem[i].getElementsByTagName('span')[0];
+    bar = elem[i][0]
+    target = elem[i][1]
+    bar.addEventListener('input', rangeValue(bar, target));
+}
+}
+
+
+*/
+
+
+
 
 createsvg();
 // 参考：https://qiita.com/daxanya1/items/734e65a7ca58bbe2a98c
