@@ -25,7 +25,6 @@
 
     form {
       visibility: visible;
-      border : solid 1px #333 ;
     }
 
     .inner{
@@ -41,7 +40,6 @@
         height: 100%;
         width: 100%;
         min-width: 400px;
-        border : solid 1px #333 ;
     }
     .my_color{
         width: 100%;
@@ -59,18 +57,28 @@
     .cat1 {
         text-align: center;
         position: relative;
-        border : solid 1px black ;
     }
 
     .cat2 {
         position: relative;
-        border : solid 1px red ;
     }
 
     .input_form {
-        width: 100%;
+        width: 95%;
         height: 100%;
-        border : solid 1px blue ;
+    }
+    .input_form2{
+        border : solid 1px #333 ;
+    }
+
+    .search_button{
+        border: 1px solid orange;
+        border-radius: 5px;
+        background-color: orange;
+        padding: 20px;
+        text-align: center;
+        color: white;
+        width: 250px;
     }
 
 
@@ -84,24 +92,10 @@
 
 <div class="inner">
 
-{# output = '<br>'.join([node.node_contents for node in node_object_list]) #}
-{% for node in node_object_list %}
-{{ node.node_contents }}
-<br/>
-{% endfor %}
-
-
-{# output += '<br><br>*** Graph\'s Information ***<br>' + '<br>'.join([f"{node_name} ----- {node_id}" for node_id, node_name in node_id_to_node_name.items()]) #}
-*** Graph's Information ***
-<br/>
-{% for node_id, node_name in node_id_to_node_name.items %}
-{{ node_name }} ----- {{ node_id }}
-<br/>
-{% endfor %}
 
 
 <div class="my_color">
----- Query Graph ----
+Similarity Search for Jupyter Notebook
 </div>
 
 
@@ -113,28 +107,105 @@
 
 <div class="column cat2">
     <div class="input_form">
-        <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
-        {% csrf_token %}
-
-        <input type="submit" name="submit_button" value="submit"> 
         <br/>
-            <label>node id: </label>
-            <input type="text" name="input_node_id" id="input_node_id" value="">
+        <form action="{% url 'interface:result' %}" method='POST'>
+            {% csrf_token %}
+            <input class="search_button" type="submit" name="search_button" value="SEARCH"> 
+        </form>
+        <br/>
+
+        <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+            {% csrf_token %}
+            Save a query.
             <br/>
-            <label>node type: </label>
-            <input type="text" name="input_node_type" id="input_node_type" value="">
+            <label>Query name: </label>
+            <input type="text" name="query_name" id="query_name" value="Enter a query name">
             <br/>
-node_contents:
+            <input type="submit" name="saving_button" value="Save"> 
+            <br/>
+        </form>
+
+        <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+            {% csrf_token %}
+            Load a query.
+            {{ form_setting_query.as_p }}
+            <input type="submit" name="loading_button" value="Load"> 
+        </form>
+        <br/>
+
+        <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+            {% csrf_token %}
+            <br/>
+            Configure each weight.
+            <br/>
+            <label>code: </label>
+            <input type="range" id="code_weight" min="0" max="10" step="0.1" value={{code_weight}}>
+            <br/>
+            <label>data: </label>
+            <input type="range" id="data_weight" min="0" max="10" step="0.1" value={{data_weight}}>
+            <br/>
+            <label>library: </label>
+            <input type="range" id="library_weight" min="0" max="10" step="0.1" value={{library_weight}}>
+            <br/>
+            <label>output's form: </label>
+            <input type="range" id="output_weight" min="0" max="10" step="0.1" value={{output_weight}}>
+            <br/>
+            <input type="submit" name="setting_button" value="Set"> 
+            <br/>
+        </form>
+
+        <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+            {% csrf_token %}
+            Configure a node.
+            <br/>
+            {{ form_setting_node.as_p }}
+            {{ form_setting_type.as_p }}
+            <br/>
+node contents:
             <br/>
             <textarea name="input_node_contents" id="input_node_contents" value="" cols="50" rows="10"></textarea>
             <br/>
+            <input type="submit" name="setting_button" value="Set"> 
+            <br/>
         </form>
+
+        <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+            {% csrf_token %}
+            Add an edge.
+            <br/>
+            <label>parent node : </label>
+            {{ form_setting_node.as_p }}
+            <br/>
+            <label>successor node: </label>
+            {{ form_setting_node.as_p }}
+            <br/>
+            <input type="submit" name="setting_button" value="Add"> 
+            <br/>
+        </form>
+        <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+            {% csrf_token %}
+            Delete an edge.
+            <br/>
+            {{ form_delete_edge.as_p }}
+            <input type="submit" name="setting_button" value="Delete"> 
+        </form>
+
+
     </div>
 </div>
 
 </div>
 
 
+<div class="result">
+
+    {# output += '<br><br>*** Result ***<br>' + '<br>'.join([f"{items[0]}, {items[1]}" for items in arranged_result]) #}
+    *** Result ***
+    <br/>
+    
+    {{arranged_result}}
+    
+</div>
 <div class = "for_debug">
     <p>
     debug: <br/>
@@ -149,7 +220,7 @@ node_contents:
 
 
 <script>
-
+const TOOLTIP_MAX_TEXT_LENGTH=300;
 
 createsvg();
 // 参考：https://qiita.com/daxanya1/items/734e65a7ca58bbe2a98c
@@ -164,11 +235,16 @@ function createsvg () {
     var node_fill_opacity = 0.3;
     var node_stroke_width = 4;
 
-    // テスト用データ
-    var node = [{'node_id':0, 'node_type':'code', 'node_contents':'code0'}, {'node_id':1, 'node_type':'code', 'node_contents':'code1'}, {'node_id':2, 'node_type':'code', 'node_contents':'code2'}, {'node_id':3, 'node_type':'code', 'node_contents':'code3'}];
-    //var node =JSON.parse('{{ node_object_list|safe }}');
-    var edge_dict = [{'parent_node_id':0, 'successor_node_id':1}, {'parent_node_id':1, 'successor_node_id':2}];
-    var root_node_id = 0;
+    // sample data
+    //var node = [{'node_id':0, 'node_type':'code', 'node_contents':'code0'}, {'node_id':1, 'node_type':'code', 'node_contents':'code1'}, {'node_id':2, 'node_type':'code', 'node_contents':'code2'}, {'node_id':3, 'node_type':'code', 'node_contents':'code3'}];
+    //var edge_dict = [{'parent_node_id':0, 'successor_node_id':1}, {'parent_node_id':1, 'successor_node_id':2}];
+    //var root_node_id = 0;
+
+    {% autoescape off %}
+    var node = {{ node_object_list }};
+    var edge_dict = {{ edges }};
+    {% endautoescape %}
+
 
     //初期化
     var edge = {};
@@ -219,6 +295,7 @@ function createsvg () {
     var g = svg.selectAll('g')
         .data(data).enter().append('g')
         .attr('transform', function(d) { return "translate(" + d[0] + "," + d[1] + ")"; });
+        //.call(drag(simulation));
 
 
     g.append('circle')
@@ -238,6 +315,10 @@ function createsvg () {
             tooltip_contents += JSON.stringify(d[3].node_contents);
             tooltip_contents += "<br>successor_node : ";
             tooltip_contents += JSON.stringify(d[4]);
+            if (tooltip_contents.length > TOOLTIP_MAX_TEXT_LENGTH){
+                tooltip_contents = tooltip_contents.substr( 0, TOOLTIP_MAX_TEXT_LENGTH );
+                tooltip_contents += "...";
+            }
             
             tooltip
                 .style("visibility", "visible")
@@ -272,7 +353,7 @@ function createsvg () {
         .attr('text-anchor', "middle")
         .attr('dy', ".35em")
         .attr('fill', "white")
-        .text(function(d,i) { return i+1; });
+        .text(function(d,i) { return d[3].node_id; });
 
     //var interpolateTypes = [d3.curveLinear,d3.curveStepBefore,d3.curveStepAfter,d3.curveBasis,d3.curveBasisOpen, d3.curveBasisClosed, d3.curveBundle,d3.curveCardinal,d3.curveCardinal,d3.curveCardinalOpen,d3.curveCardinalClosed,d3.curveNatural];
     //var interpolateNames = ['d3.curveLinear','d3.curveStepBefore','d3.curveStepAfter','d3.curveBasis','d3.curveBasisOpen', 'd3.curveBasisClosed', 'd3.curveBundle','d3.curveCardinal','d3.curveCardinal','d3.curveCardinalOpen','d3.curveCardinalClosed','d3.curveNatural'];
@@ -286,7 +367,6 @@ function createsvg () {
         .x(function(d) {return d[0];})
         .y(function(d) {return d[1];});
 
-
     var path = svg.append('path')
         .attr('d', line(data))
         .attr('stroke', 'lightgreen')
@@ -296,6 +376,32 @@ function createsvg () {
         //.attr('arrowMarkerAbsolute', true);
 
 
+
+
+    drag = simulation => {
+  
+        function dragstarted(event) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            event.subject.fx = event.subject.x;
+            event.subject.fy = event.subject.y;
+        }
+        
+        function dragged(event) {
+            event.subject.fx = event.x;
+            event.subject.fy = event.y;
+        }
+        
+        function dragended(event) {
+            if (!event.active) simulation.alphaTarget(0);
+            event.subject.fx = null;
+            event.subject.fy = null;
+        }
+        
+        return d3.drag()
+            .on("start", dragstarted)
+            .on("drag", dragged)
+            .on("end", dragended);
+    }
 };
 
 </script>

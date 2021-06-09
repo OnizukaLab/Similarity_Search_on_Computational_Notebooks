@@ -13,7 +13,9 @@ from django.urls import reverse
 from django.views import generic
 from django.utils import timezone
 
-from .models import QueryLibrary, QueryNode, QueryEdge
+from .models import QueryLibrary, QueryNode, QueryEdge, QueryJson
+from .forms import HelloForm, SelectNodeForm, SelectEdgeForm, SelectTypeForm, SelectSavedQueryForm
+
 
 current_dir=os.getcwd()
 #search_engine_path="/Users/misato/Desktop/my_code" # 以前Jupyterで動かしていた方（卒論用の実験）, コピー時点で内容は同じ
@@ -33,6 +35,7 @@ from workflow_matching import WorkflowMatching
 
 # Global variable
 G_in_this_nb=None
+jupyter_notebook_localhost_number=8888
 
 
 # ***** initialization *****
@@ -78,13 +81,16 @@ def get_db_graph(wm):
     G_in_this_nb=wm.G
     return wm, G_in_this_nb
 
-def get_db_graph2(wm):
-    wm.G=G_in_this_nb
-    return wm
+def set_db_graph2(wm, G_in_this_nb, flg_get_db_graph):
+    if flg_get_db_graph:
+        return wm.set_db_graph2(G_in_this_nb)
+    else:
+        return wm
 
     
 wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
 #wm, G_in_this_nb = get_db_graph(wm)
+#flg_get_db_graph = True
 
 
 
@@ -181,42 +187,108 @@ def form_old(request, *args, **kwargs):
 def index(request, *args, **kwargs):
 
     wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
-    #wm.set_db_graph2(G_in_this_nb)
-    #wm, G_in_this_nb = get_db_graph(wm)
     debug_data=""
-    debug_data=request.POST
-    request_data=request.POST
-    #node_object_list = []
-    #for item in QueryNode.objects.all():
-    #    node_object_list.append(item)
-    node_object_list = QueryNode.objects.all()
-    wm, node_id_to_node_name = build_QueryGraph(wm, node_object_list)
-    #top_k_result, nb_score = search(wm, w_c=8, w_v=1, w_l=1, w_d=1, k=5)
-    return render(request, 'interface/index.html', {'node_object_list': node_object_list, 'node_id_to_node_name': node_id_to_node_name, "debug_data":debug_data})
+    try:
+        debug_data=request.POST
+    except:
+        pass
+
+    #initialize
+    code_weight=1
+    data_weight=1
+    library_weight=1
+    output_weight=1
+
+    wm, node_id_to_node_name = build_QueryGraph(wm)
+
+    send_node_object_list=arrange_node_object_list(QueryNode.objects.all())
+    edges=arrange_edge_object_list(QueryEdge.objects.all())
+    msg={'node_object_list': send_node_object_list, 'edges':edges, 'node_id_to_node_name': node_id_to_node_name, "debug_data":debug_data, "code_weight":code_weight, "data_weight":data_weight, "library_weight":library_weight, "output_weight":output_weight}
+    data=[
+        ('サンプル1', '1'),
+        ('サンプル2', '2'),
+        ('サンプル3', '3'),
+    ]
+    #msg['form'] = HelloForm(label='test_label', choices=data)
+    #msg['form'] = HelloForm()
+    msg['form_setting_node'] = SelectNodeForm()
+    msg['form_delete_edge'] = SelectEdgeForm()
+    msg['form_setting_type'] = SelectTypeForm()
+    msg['form_setting_query'] = SelectSavedQueryForm()
+    msg['query_name']=""
+    
+
+    return render(request, 'interface/index.html', msg)
 
 def form(request, *args, **kwargs):
 
     wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
-    #wm.set_db_graph2(G_in_this_nb)
-    #wm, G_in_this_nb = get_db_graph(wm)
     debug_data=""
     debug_data=request.POST
     request_data=request.POST
-    node_id = int(request_data["input_node_id"])
-    node_type = request_data["input_node_type"]
-    node_contents="node_contents"
-    node_contents = request_data["input_node_contents"]
-    new_node = QueryNode(node_id=node_id, node_type=node_type, node_contents=node_contents)
-    QueryNode.objects.filter(node_id=node_id).delete()
-    new_node.save()
-    node_object_list = QueryNode.objects.all()
+    #if (request.method == 'POST'):
+    try:
+        node_id = int(request_data["input_node_id"])
+        node_type = request_data["input_node_type"]
+        node_contents = request_data["input_node_contents"]
+    except:
+        pass
+    else:
+        new_node = QueryNode(node_id=node_id, node_type=node_type, node_contents=node_contents)
+        QueryNode.objects.filter(node_id=node_id).delete()
+        new_node.save()
+    try:
+        code_weight=int(request_data["code_weight"])
+        data_weight=int(request_data["data_weight"])
+        library_weight=int(request_data["library_weight"])
+        output_weight=int(request_data["output_weight"])
+    except:
+        code_weight=1
+        data_weight=1
+        library_weight=1
+        output_weight=1
+    try:
+        parent_node_id = int(request_data["input_parent_node_id"])
+        successor_node_id = int(request_data["input_successor_node_id"])
+    except:
+        pass
+    else:
+        new_edge = QueryEdge(parent_node_id=parent_node_id, successor_node_id=successor_node_id)
+        new_edge.save()
 
-    wm, node_id_to_node_name = build_QueryGraph(wm, node_object_list)
+    if "saving_button" in request_data:
+        saving_query_name = request_data["query_name"]
+        save_query(saving_query_name, QueryNode.objects.all(), QueryEdge.objects.all(), QueryLibrary.objects.all())
+    if "loading_button" in request_data:
+        pass
+
+    if "search_button" in request_data:
+        node_id_to_node_name, nb_score, send_node_object_list, arranged_result = get_result(wm)
+    else:
+        arranged_result=""
+
+
+    wm, node_id_to_node_name = build_QueryGraph(wm)
         
-    #top_k_result, nb_score = search(wm, w_c=8, w_v=1, w_l=1, w_d=1, k=5)
+    send_node_object_list=arrange_node_object_list(QueryNode.objects.all())
+    edges=arrange_edge_object_list(QueryEdge.objects.all())
 
-    #node_object_list = QueryNode.objects.all()
-    return render(request, 'interface/index.html', {'node_object_list': node_object_list, 'node_id_to_node_name': node_id_to_node_name, "debug_data":debug_data})
+
+    msg={'node_object_list': send_node_object_list, 'edges':edges,'node_id_to_node_name': node_id_to_node_name, "debug_data":debug_data, "code_weight":code_weight, "data_weight":data_weight, "library_weight":library_weight, "output_weight":output_weight}
+    data=[
+        ('サンプル1', '1'),
+        ('サンプル2', '2'),
+        ('サンプル3', '3'),
+    ]
+    #msg['form'] = HelloForm(label='test_label', choices=data)
+    #msg['form'] = HelloForm()
+    msg['form_setting_node'] = SelectNodeForm()
+    msg['form_delete_edge'] = SelectEdgeForm()
+    msg['form_setting_type'] = SelectTypeForm()
+    msg['form_setting_query'] = SelectSavedQueryForm()
+    msg['query_name']=""
+    msg["arranged_result"]=arranged_result
+    return render(request, 'interface/index.html', msg)
 
 #不使用
 def index_not_use_query_database(request, *args, **kwargs):
@@ -366,7 +438,7 @@ def result_old(request):
     return HttpResponse(output)
 
 
-def result(request):
+def result_old2(request):
     """
     検索を行い，検索結果のページを出力する．
     """
@@ -392,6 +464,50 @@ def result(request):
     node_object_list = QueryNode.objects.all()
     arranged_result = arrange_result_dict_for_html(jupyter_notebook_localhost_number, top_k_result, dict_nb_name_and_cleaned_nb_name)
     return render(request, 'interface/result.html', {'node_object_list': node_object_list, 'node_id_to_node_name': node_id_to_node_name, 'arranged_result': arranged_result})
+
+
+def result(request):
+    """
+    検索を行い，検索結果のページを出力する．
+    """
+    wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
+    wm.set_db_graph2(G_in_this_nb)
+    #wm, G_in_this_nb = get_db_graph(wm)
+
+    wm, node_id_to_node_name = build_QueryGraph(wm)
+        
+    top_k_result, nb_score = search(wm, w_c=8, w_v=1, w_l=1, w_d=1, k=5)
+
+    send_node_object_list=arrange_node_object_list(QueryNode.objects.all())
+    arranged_result = arrange_result_dict_for_html(jupyter_notebook_localhost_number, top_k_result, dict_nb_name_and_cleaned_nb_name)
+    arranged_result = json.dumps(arranged_result)
+    return render(request, 'interface/result.html', {'node_object_list': send_node_object_list, 'node_id_to_node_name': node_id_to_node_name, 'arranged_result': arranged_result})
+
+def get_result(wm):
+    wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
+    wm.set_db_graph2(G_in_this_nb)
+    #wm, G_in_this_nb = get_db_graph(wm)
+
+    wm, node_id_to_node_name = build_QueryGraph(wm)
+        
+    top_k_result, nb_score = search(wm, w_c=8, w_v=1, w_l=1, w_d=1, k=5)
+
+    send_node_object_list=arrange_node_object_list(QueryNode.objects.all())
+    arranged_result = arrange_result_dict_for_html(jupyter_notebook_localhost_number, top_k_result, dict_nb_name_and_cleaned_nb_name)
+    arranged_result = json.dumps(arranged_result)
+    return node_id_to_node_name, nb_score, send_node_object_list, arranged_result
+
+def arrange_node_object_list(node_object_list):
+    send_node_object_list=[]
+    for item in node_object_list:
+        send_node_object_list.append({"node_id":item.node_id, "node_type": item.node_type, "node_contents": item.node_contents})
+    return send_node_object_list
+
+def arrange_edge_object_list(edge_object_list):
+    send_edge_object_list=[]
+    for item in edge_object_list:
+        send_edge_object_list.append({"parent_node_id":item.parent_node_id, "successor_node_id":item.successor_node_id})
+    return send_edge_object_list
 
 def build_QueryGraph_old():
     """
@@ -456,13 +572,13 @@ def build_QueryGraph_old():
     return QueryGraph, query_root, query_lib, query_cell_code, query_table, node_id_to_node_name
 
 
-def build_QueryGraph(wm, node_object_list):
+def build_QueryGraph(wm):
     """
     wm: WorkflowMatchingのインスタンス．
     build_QueryGraph_oldと異なり，wmを引数として返り値もwm．
     """
     QueryGraph = nx.DiGraph()
-    #node_object_list = QueryNode.objects.all()
+    node_object_list = QueryNode.objects.all()
     query_cell_code={}
     query_table={}
 
@@ -530,6 +646,7 @@ def build_QueryGraph(wm, node_object_list):
 
     logging.info("Completed!: Building a query graph.")
     return wm, node_id_to_node_name
+
 
 def dump_to_json(QueryNode_object_list, QueryEdge_object_list, QueryLibrary_object_list):
     """
@@ -608,7 +725,10 @@ def build_query_from_json(json_file):
     logging.info("Completed!: Building a query graph.")
     return QueryGraph, query_root, query_lib, query_cell_code, query_table, node_id_to_node_name
 
-
+def save_query(saving_query_name, QueryNode_object_list, QueryEdge_object_list, QueryLibrary_object_list):
+    save_json_file = dump_to_json(QueryNode_object_list, QueryEdge_object_list, QueryLibrary_object_list)
+    q_json = QueryJson(query_name=saving_query_name, query_contents=save_json_file)
+    q_json.save()
 
 def search(wm, w_c, w_v, w_l, w_d, k, flg_chk_invalid_by_workflow_structure=True, flg_flg_prune_under_sim=True, flg_optimize_calc_order=True, flg_caching=True, flg_calc_data_sim_approximately=False, flg_cache_query_table=False, save_running_time=False):
     return searching_top_k_notebooks(wm, w_c, w_v, w_l, w_d, k, flg_chk_invalid_by_workflow_structure=flg_chk_invalid_by_workflow_structure, flg_flg_prune_under_sim=flg_flg_prune_under_sim, flg_optimize_calc_order=flg_optimize_calc_order, flg_caching=flg_caching, flg_calc_data_sim_approximately=flg_calc_data_sim_approximately, flg_cache_query_table=flg_cache_query_table, save_running_time=save_running_time)
