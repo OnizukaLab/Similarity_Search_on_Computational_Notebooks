@@ -40,6 +40,7 @@ form {
 
 .input_form2{
     padding: 1.0rem 1.0rem; 
+    font-size: 18px;
 }
 
 .for_debug{
@@ -47,13 +48,16 @@ form {
     padding: 1.0rem 0; 
 }
 
+.label{
+    user-select: none;
+}
 .tooltip {
     position: absolute;
     text-align: left;
     width: auto;
     height: auto;
     padding: 5px;
-    font: 12px;
+    font-size: 18px;
     background: white;
     -webkit-box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.8);
     -moz-box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.8);
@@ -61,6 +65,17 @@ form {
     visibility: hidden;
 }
 
+.tooltip_wrap1{
+    display: inline-block;
+    text-align: right;
+    width: 7em;
+    padding: 0 0.7rem 0 0; 
+    vertical-align: top;
+}
+
+.tooltip_wrap2{
+    display: inline-block;
+}
 
 .wrap{
     margin: auto;
@@ -120,59 +135,66 @@ form {
     font-size: 20px;
 }
 
+.label_weight{
+    display: inline-block;
+    text-align: right;
+    width: 4em;
+    padding: 0 0.3rem 0 0; 
+}
 
-ul{
-    width: 300px;
-    margin:0 auto;
-  }
-  li{
-    background-color: #fef5e0;
-    list-style:none;
-    margin-top:10px;
-  }
+.error_field{
+    color: orangered;
+}
+
+
+
+
+
+
+
+
   
-  
-  .question{
-    position: relative;
-    margin: 0;
-    padding: .5em 1em;
-    font-size: 1em;
-    font-weight: bold;
-    cursor: pointer;
-  }
-  .question:hover{
-      text-decoration:underline;
-  }
-  
-  .question:after {
-    content: "";
-    position: absolute;
-    right: 25px;
-    top: 38%;
-    transition: all 0.2s ease-in-out;
-  /*   要素の動きを指定 */
-    
-    display: block;
-    width: 8px;
-    height: 8px;
-    border-top: solid 4px #000;
-    border-right: solid 4px #000;
-    
-    -webkit-transform: rotate(135deg);
-    transform: rotate(135deg);
-  /* transform: rotateで要素の角度を指定 */
-    
-  }
-  
-  .question.open:after {
-    -webkit-transform: rotate(-45deg);
-    transform: rotate(-45deg);
-    top: 45%;
-  /*   .openクラスがついた時の要素の角度を指定 */
-  }
-  .answer{
-    padding: .5em 1em;
-  }
+.question{
+position: relative;
+margin: 0;
+padding: .5em 1em;
+font-size: 1em;
+font-weight: bold;
+cursor: pointer;
+}
+.question:hover{
+    text-decoration:underline;
+}
+
+.question:after {
+content: "";
+position: absolute;
+right: 25px;
+top: 38%;
+transition: all 0.2s ease-in-out;
+/*   要素の動きを指定 */
+
+display: block;
+width: 8px;
+height: 8px;
+border-top: solid 4px #000;
+border-right: solid 4px #000;
+
+-webkit-transform: rotate(135deg);
+transform: rotate(135deg);
+/* transform: rotateで要素の角度を指定 */
+
+}
+
+.question.open:after {
+-webkit-transform: rotate(-45deg);
+transform: rotate(-45deg);
+top: 45%;
+/*   .openクラスがついた時の要素の角度を指定 */
+}
+.answer{
+padding: .5em 1em;
+}
   
   
   

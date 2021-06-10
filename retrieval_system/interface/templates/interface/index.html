@@ -35,7 +35,7 @@
                     <div class="form_wrapper1">
                         <div class="form_wrapper2">
                             <div id="graph_viz"></div>
-                            <svg width="800" height="600"></svg>
+                            <svg width="600" height="600"></svg>
                         </div>
                     </div>
                 </div>
@@ -50,25 +50,33 @@
                             </form>
                             </div>
                         </div>
+                        
+                        <div class="error_field">
+                            <div class="form_wrapper1">
+                                <div class="form_wrapper2">
+                                    {{err_msg}}
+                                </div>
+                            </div>
+                        </div>
 
                         <div class="form_wrapper1">
                             <div class="form_wrapper2">
                                 <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
                                     {% csrf_token %}
                                     Configure each weight.<br/>
-                                    <label>code: </label>
+                                    <label class="label_weight">code: </label>
                                     <input type="range" id="code_weight" name="code_weight" min="0" max="10" step="0.5" value={{code_weight}}>
                                     <span id="current-code_weight">{{code_weight}}</span>
                                     <br/>
-                                    <label>data: </label>
+                                    <label class="label_weight">data: </label>
                                     <input type="range" id="data_weight" name="data_weight" min="0" max="10" step="0.5" value={{data_weight}}>
                                     <span id="current-data_weight">{{data_weight}}</span>
                                     <br/>
-                                    <label>library: </label>
+                                    <label class="label_weight">library: </label>
                                     <input type="range" id="library_weight" name="library_weight" min="0" max="10" step="0.5" value={{library_weight}}>
                                     <span id="current-library_weight">{{library_weight}}</span>
                                     <br/>
-                                    <label>output's form: </label>
+                                    <label class="label_weight">output: </label>
                                     <input type="range" id="output_weight" name="output_weight" min="0" max="10" step="0.5" value={{output_weight}}>
                                     <span id="current-output_weight">{{output_weight}}</span>
                                     <br/>
@@ -92,16 +100,37 @@
                         <div class="form_wrapper1">
                             <div class="form_wrapper2">
                                 <div class="question">
-                                    Save a query.
+                                    Save a query
                                 </div>
                                 <div class="answer">
                                     <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
                                         {% csrf_token %}
                                         <br/>
+                                        <p>Save this query to the server</p>
                                         <label>Query name: </label>
                                         <input type="text" name="query_name" id="query_name" value="Enter a query name">
                                         <br/>
                                         <input type="submit" name="saving_button" value="Save"> 
+                                    </form>
+                                    <form class="input_form2" action="{% url 'interface:export' %}" method='POST'>
+                                        <p>Export this query as "<span id="export_file_name2">{{uploadfile.filename}}</span>.json"</p>
+                                        <input type="text" name="export_file_name" id="export_file_name" value="Enter a query name">
+                                        <input type="submit" name="saving_button" value="Export"> 
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form_wrapper1">
+                            <div class="form_wrapper2">
+                                <div class="question">
+                                    Delete a query
+                                </div>
+                                <div class="answer">
+                                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+                                    {% csrf_token %}
+                                    {{ form_setting_query.as_p }}
+                                    <input type="submit" name="setting_button" value="Delete"> 
                                     </form>
                                 </div>
                             </div>
@@ -135,13 +164,17 @@
                                 <div class="answer">
                                     <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
                                         {% csrf_token %}
-                                        {{ form_setting_node.as_p }}
+                                        <label>node id</label>
+                                        <input type="number" min="0" max="100" name="input_node_id" value="0" id="add_or_change_input">
                                         {{ form_setting_type.as_p }}
                                         <br/>node contents:
                                         <br/>
                                         <textarea name="input_node_contents" id="input_node_contents" value="" cols="50" rows="10"></textarea>
                                         <br/>
-                                        <input type="submit" name="setting_button" value="Set"> 
+                                        <label>parent node id</label>
+                                        <input type="number" min="0" max="100" name="input_parent_node_id" value="0">
+                                        <br/>
+                                        <input type="submit" id="add_or_change" name="setting_button" value="Set"> 
                                         <br/>
                                     </form>
                                 </div>
@@ -171,11 +204,7 @@
                                 <div class="answer">
                                     <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
                                         {% csrf_token %}
-                                        <label>parent node : </label>
-                                        {{ form_setting_node.as_p }}
-                                        <br/>
-                                        <label>successor node: </label>
-                                        {{ form_setting_node.as_p }}
+                                        {{ form_setting_parent_node.as_p }}
                                         <br/>
                                         <input type="submit" name="setting_button" value="Add"> 
                                         <br/>
@@ -266,7 +295,7 @@ var rangeOnChange3 = (e) =>{
 var rangeOnChange4 = (e) =>{
   setCurrentValue4(e.target.value);
 }
-
+/*
 window.onload = () => {
   inputElem.addEventListener('input', rangeOnChange); // スライダー変化時にイベントを発火
   setCurrentValue(inputElem.value); // ページ読み込み時に値をセット
@@ -277,6 +306,15 @@ window.onload = () => {
   inputElem4.addEventListener('input', rangeOnChange4);
   setCurrentValue4(inputElem4.value);
 }
+*/
+inputElem.addEventListener('input', rangeOnChange); // スライダー変化時にイベントを発火
+setCurrentValue(inputElem.value); // ページ読み込み時に値をセット
+inputElem2.addEventListener('input', rangeOnChange2);
+setCurrentValue2(inputElem2.value);
+inputElem3.addEventListener('input', rangeOnChange3);
+setCurrentValue3(inputElem3.value);
+inputElem4.addEventListener('input', rangeOnChange4);
+setCurrentValue4(inputElem4.value);
 
 // ******** 折りたたみ（アコーディオン）の設定 **************************
 // https://qiita.com/kei_1011/items/514c77698f4136889f6e
@@ -313,6 +351,46 @@ var edge_list = {{ edges }};
 {% endautoescape %}
 
 
+// Add/Configure a node. のところのsubmitボタンの表示を変更する.
+// ノードidの入力部分にすでに保存されているノードidを入力した場合, Changeと表示する．
+// ノードidの入力部分にまだ保存されてないノードidを入力した場合, Addと表示する．
+var add_or_change = document.getElementById("add_or_change");
+var add_or_change_input = document.getElementById("add_or_change_input");
+var setCurrentValue5 = (val) => {
+    add_or_change.value = "Add";
+    for(var i=0;i<node_object_list.length;i++){
+        if(add_or_change_input.value==node_object_list[i].node_id){
+            add_or_change.value = "Change";
+            break;
+        }
+    }
+    add_or_change.innerText = val;
+}
+var rangeOnChange5 = (e) =>{
+  setCurrentValue5(e.target.value);
+}
+add_or_change_input.addEventListener('input', rangeOnChange5);
+setCurrentValue5(add_or_change_input.value);
+
+// ******** エクスポートの設定 **************************
+var inputElem6 = document.getElementById('export_file_name'); // input要素
+var currentValueElem6 = document.getElementById('export_file_name2'); // input要素
+var setCurrentValue6 = (val) => {
+    currentValueElem6.innerText = val;
+}
+var rangeOnChange6 = (e) =>{
+  setCurrentValue6(e.target.value);
+}
+inputElem6.addEventListener('input', rangeOnChange6);
+setCurrentValue6(inputElem6.value);
+
+
+
+
+
+
+
+
 const TOOLTIP_MAX_TEXT_LENGTH=300;
 var tooltip = d3.select("body").append("div").attr("class", "tooltip");
 // nodeの半径
@@ -323,159 +401,209 @@ var node_color_fill = "#adeed1";
 var node_color_stroke = "#7ec5b3";
 var node_stroke_width = 4;
 
-// sample
-// https://wizardace.com/d3-forcesimulation-onlynode/
-// 1. 描画用のデータ準備
-//var width = document.querySelector("svg").clientWidth;
-//var height = document.querySelector("svg").clientHeight;
-var width = 800;
-var height = 600;
-var nodeNumber = node_object_list.length;
-var nodesData = [];
-for(var i = 0; i < nodeNumber; i++) {
-    nodesData.push({
-        "index": node_object_list[i].node_id,
-        "x": width * Math.random(),
-        "y": height * Math.random(),
-        "r": node_r
-    });
-}
+drawgraph()
 
-var linksData = [];
-for(var i=0;i<edge_list.length;i++){
-    num_i = edge_list[i].parent_node_id;
-    num_j = edge_list[i].successor_node_id;
-    linksData.push({
-        "source": num_i,
-        "target": num_j,
-        "l": edge_len
-    });
-}
+function drawgraph(){
+    // sample
+    // 参考1: https://qiita.com/daxanya1/items/734e65a7ca58bbe2a98c
+    // 参考2: https://wizardace.com/d3-forcesimulation-onlynode/
 
-/* 元のソースコード
-var linksData = [];
-var i = 0;
-for(var j = i + 1; j < nodeNumber; j++) {
-linksData.push({
-    "source": i,
-    "target": j,
-    "l": Math.random() * 150 + 5 + nodesData[i].r + nodesData[j].r
-});
-}
-*/  
-
-// 2. svg要素を配置
-var link = d3.select("svg")
-.selectAll("line")
-.data(linksData)
-.enter()
-.append("line")
-.attr("stroke-width", 1)
-.attr("stroke", "black");
-
-var node = d3.select("svg")
-.selectAll("circle")
-.data(nodesData)
-.enter()
-.append("circle")
-.attr("r", function(d) { return d.r })
-.style("fill", node_color_fill)
-.attr("stroke", node_color_stroke)
-.style("stroke-width", node_stroke_width)
-.on("mouseover", function(d,i) {
-    var ind = d.index
-    var tooltip_contents = "node id : ";
-    tooltip_contents += JSON.stringify(node_object_list[ind].node_id);
-    tooltip_contents += "<br>node type : ";
-    tooltip_contents += JSON.stringify(node_object_list[ind].node_type);
-    tooltip_contents += "<br>node contents : ";
-    tooltip_contents += JSON.stringify(node_object_list[ind].node_contents);
-    if (tooltip_contents.length > TOOLTIP_MAX_TEXT_LENGTH){
-        tooltip_contents = tooltip_contents.substr( 0, TOOLTIP_MAX_TEXT_LENGTH );
-        tooltip_contents += "...";
+    // 1. 描画用のデータ準備
+    //var width = document.querySelector("svg").clientWidth;
+    //var height = document.querySelector("svg").clientHeight;
+    var nodeNumber = node_object_list.length;
+    var nodesData = [];
+    var nodeid2ind = {};
+    for(var i = 0; i < nodeNumber; i++) {
+        nodesData.push({
+            "index": node_object_list[i].node_id,
+            "x": width * Math.random(),
+            "y": height * Math.random(),
+            "r": node_r
+        });
+        nodeid2ind[node_object_list[i].node_id]=i
     }
-    tooltip
-        .style("visibility", "visible")
-        .html(tooltip_contents);
-    })
-.on("mousemove", function(d) {
-    tooltip
-        .style("top", (d3.event.pageY - 20) + "px")
-        .style("left", (d3.event.pageX + 10) + "px");
-    })
-.on("mouseout", function(d) {
-    tooltip.style("visibility", "hidden");
-    })
-.on("mousedown", function(d, i) {
-    d3.select(this)
-        .attr("fill", "blue")
-        .attr("stroke", "green");
-    })
-.on("mouseup", function() { 
-    d3.select(this)
-        .attr("fill", node_color_fill)
-        .attr("stroke", node_color_stroke);
-    })
-.call(d3.drag()
-    .on("start", dragstarted)
-    .on("drag", dragged)
-    .on("end", dragended));
 
-// 3. forceSimulation設定
-var simulation = d3.forceSimulation()
-.force("link",
-    d3.forceLink()
-    .distance(function(d) { return d.l; })
-    .strength(0.03)
-    .iterations(16))
-.force("collide",
-    d3.forceCollide()
-    .radius(function(d) { return d.r; })
-    .strength(0.7)
-    .iterations(16))
-.force("charge", d3.forceManyBody().strength(-200))
-.force("x", d3.forceX().strength(0.02).x(width / 2))
-.force("y", d3.forceY().strength(0.02).y(height / 2));
+    var linksData = [];
+    for(var i=0;i<edge_list.length;i++){
+        num_i = edge_list[i].parent_node_id;
+        num_j = edge_list[i].successor_node_id;
+        linksData.push({
+            "source": nodeid2ind[num_i],
+            "target": nodeid2ind[num_j],
+            "l": edge_len
+        });
+    }
 
-simulation
-.nodes(nodesData)
-.on("tick", ticked);
 
-simulation.force("link")
-.links(linksData)
-.id(function(d) { return d.index; });
+    // 2. svg要素を配置
+    // DAG表現のための矢印
+    var marker = d3.select("svg").append("svg:defs").append("svg:marker")
+    .attr("id", "triangle")
+    .attr("refX", node_r+node_stroke_width+10)
+    .attr("refY", 6)
+    .attr("markerWidth", 30)
+    .attr("markerHeight", 30)
+    .attr("orient", "auto")
+    .append("path")
+    .attr("d", "M 0 0 12 6 0 12 3 6")
+    .style("fill", "black");
 
-// 4. forceSimulation 描画更新用関数
-function ticked() {
-link
-    .attr("x1", function(d) { return d.source.x; })
-    .attr("y1", function(d) { return d.source.y; })
-    .attr("x2", function(d) { return d.target.x; })
-    .attr("y2", function(d) { return d.target.y; });
-node
-    .attr("cx", function(d) { return d.x; })
-    .attr("cy", function(d) { return d.y; });
+    // 辺
+    var link = d3.select("svg")
+    .selectAll("line")
+    .data(linksData)
+    .enter()
+    .append("line")
+    .attr("stroke-width", 1)
+    .attr("stroke", "black")
+    .attr("marker-end", "url(#triangle)");
+
+    // ノード
+    var mouse_flg = 0; // ノードをクリックしたら，他のノードにmouseoverするまでそこにtooltipを固定する．
+    var node = d3.select("svg")
+    .selectAll("circle")
+    .data(nodesData)
+    .enter()
+    .append("circle")
+    .attr("r", function(d) { return d.r })
+    .style("fill", node_color_fill)
+    .attr("stroke", node_color_stroke)
+    .style("stroke-width", node_stroke_width)
+    .on("mouseover", function(d) {
+        // tooltip_contentsはなんども呼び出すのであらかじめvar node外でリスト等に格納する方が高速になりそう．
+        var ind = d.index;
+        var tooltip_contents = "<span class='tooltip_wrap1'>node id :</span>";
+        tooltip_contents += JSON.stringify(node_object_list[ind].node_id);
+        tooltip_contents += "<br><span class='tooltip_wrap1'>node type :</span>";
+        tooltip_contents += node_object_list[ind].node_type;
+        tooltip_contents += "<br><span class='tooltip_wrap1'>node contents :</span><span class='tooltip_wrap2'>";
+        tooltip_contents += node_object_list[ind].node_contents.replace("\n", "<br/>");
+        tooltip_contents += "</span>";
+        if (tooltip_contents.length > TOOLTIP_MAX_TEXT_LENGTH){
+            tooltip_contents = tooltip_contents.substr( 0, TOOLTIP_MAX_TEXT_LENGTH );
+            tooltip_contents += "...";
+        }
+        tooltip
+            .style("visibility", "visible")
+            .html(tooltip_contents);
+        mouse_flg=0;
+        d3.select(this)
+            .attr("stroke", "green");
+        })
+    .on("mousemove", function(d) {
+        tooltip
+            .style("top", (d3.event.pageY - 20) + "px")
+            .style("left", (d3.event.pageX + 10) + "px");
+        })
+    .on("mouseout", function(d) {
+        if(mouse_flg==0){
+            tooltip.style("visibility", "hidden");
+            d3.select(this)
+                .attr("stroke", node_color_stroke);
+        }
+        })
+    .on("mousedown", function(d, i) {
+        var ind = d.index
+        var tooltip_contents = "node id : ";
+        tooltip_contents += JSON.stringify(node_object_list[ind].node_id);
+        tooltip_contents += "<br>node type : ";
+        tooltip_contents += JSON.stringify(node_object_list[ind].node_type);
+        tooltip_contents += "<br>node contents : ";
+        tooltip_contents += JSON.stringify(node_object_list[ind].node_contents);
+        tooltip_contents += "<br>edges : ";
+        tooltip_contents += JSON.stringify(edge_list);
+        if (tooltip_contents.length > TOOLTIP_MAX_TEXT_LENGTH){
+            tooltip_contents = tooltip_contents.substr( 0, TOOLTIP_MAX_TEXT_LENGTH );
+            tooltip_contents += "...";
+        }
+        tooltip
+            .style("visibility", "visible")
+            .html(tooltip_contents);
+        //mouse_flg=1;
+        })
+    .on("mouseup", function() { 
+        d3.select(this)
+            .attr("stroke", node_color_stroke);
+        })
+    .call(d3.drag()
+        .on("start", dragstarted)
+        .on("drag", dragged)
+        .on("end", dragended));
+
+
+    var label = d3.select("svg")
+    .attr("class", "label")
+    .selectAll("label")
+    .data(nodesData, function(d) {return d.index; } )
+    .enter()
+    .append('text')
+    .attr('text-anchor', "middle")
+    .attr('dy', ".35em")
+    .attr('fill', "black")
+    .text(function(d, i) { return d.index; });
+
+
+
+    // 3. forceSimulation設定
+    var simulation = d3.forceSimulation()
+    .force("link",
+        d3.forceLink()
+        .distance(function(d) { return d.l; })
+        .strength(0.03)
+        .iterations(16))
+    .force("collide",
+        d3.forceCollide()
+        .radius(function(d) { return d.r; })
+        .strength(0.7)
+        .iterations(16))
+    .force("charge", d3.forceManyBody().strength(-200))
+    .force("x", d3.forceX().strength(0.02).x(width / 2))
+    .force("y", d3.forceY().strength(0.02).y(height / 2));
+
+    simulation
+    .nodes(nodesData)
+    .on("tick", ticked);
+
+    simulation.force("link")
+    .links(linksData)
+    .id(function(d) { return d.index; });
+
+    // 4. forceSimulation 描画更新用関数
+    function ticked() {
+    link
+        .attr("x1", function(d) { return d.source.x; })
+        .attr("y1", function(d) { return d.source.y; })
+        .attr("x2", function(d) { return d.target.x; })
+        .attr("y2", function(d) { return d.target.y; });
+    node
+        .attr("cx", function(d) { return d.x; })
+        .attr("cy", function(d) { return d.y; });
+
+    label
+        .attr("x", function(d) { return d.x; })
+        .attr("y", function(d) { return d.y; });
+    }
+
+    // 5. ドラッグ時のイベント関数
+    function dragstarted(d) {
+    if(!d3.event.active) simulation.alphaTarget(0.3).restart();
+    d.fx = d.x;
+    d.fy = d.y;
+    }
+
+    function dragged(d) {
+    d.fx = d3.event.x;
+    d.fy = d3.event.y;
+    }
+
+    function dragended(d) {
+    if(!d3.event.active) simulation.alphaTarget(0);
+    d.fx = null;
+    d.fy = null;
+    }
+
 }
-
-// 5. ドラッグ時のイベント関数
-function dragstarted(d) {
-if(!d3.event.active) simulation.alphaTarget(0.3).restart();
-d.fx = d.x;
-d.fy = d.y;
-}
-
-function dragged(d) {
-d.fx = d3.event.x;
-d.fy = d3.event.y;
-}
-
-function dragended(d) {
-if(!d3.event.active) simulation.alphaTarget(0);
-d.fx = null;
-d.fy = null;
-}
-
-
 </script>
 
 

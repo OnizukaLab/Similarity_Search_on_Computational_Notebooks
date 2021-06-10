@@ -14,7 +14,7 @@ from django.views import generic
 from django.utils import timezone
 
 from .models import QueryLibrary, QueryNode, QueryEdge, QueryJson
-from .forms import HelloForm, SelectNodeForm, SelectEdgeForm, SelectTypeForm, SelectSavedQueryForm
+from .forms import HelloForm, SelectNodeForm, SelectEdgeForm, SelectTypeForm, SelectSavedQueryForm, SelectParentNodeForm
 
 
 current_dir=os.getcwd()
@@ -88,11 +88,19 @@ def set_db_graph2(wm, G_in_this_nb, flg_get_db_graph):
         return wm
 
 def delete_node_safely(node_id):
+    err_msg=""
     if QueryEdge.objects.filter(parent_node_id=node_id).exists() or QueryEdge.objects.filter(successor_node_id=node_id).exists():
-        logging.info("Please delete related edges first.")
+        logging.error("error: Please delete related edges first.")
+        err_msg = "Error: Selected node has one or more edges. Please delete the edges first."
     else:
         QueryNode.objects.filter(node_id=node_id).delete()
+    return err_msg
+        
+
+def delete_edge_safely(edge):
+    QueryEdge.objects.filter(parent_node_id=edge[0], successor_node_id=edge[1]).delete()
     
+
 wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
 #wm, G_in_this_nb = get_db_graph(wm)
 #flg_get_db_graph = True
@@ -190,67 +198,116 @@ def form_old(request, *args, **kwargs):
     return render(request, 'interface/querygraph.html', {'node_object_list': node_object_list, 'node_id_to_node_name': node_id_to_node_name, "debug_data":debug_data})
 
 def index(request, *args, **kwargs):
+    logging.info(f"Loaded \'index\' page.")
 
-    wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
-    debug_data=""
-    try:
-        debug_data=request.POST
-    except:
-        pass
+    #wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
+    request_data=request.POST
 
     #initialize
     code_weight=1
     data_weight=1
     library_weight=1
     output_weight=1
+    uploadfile={"filename":"sample_file_name"}
 
-    wm, node_id_to_node_name = build_QueryGraph(wm)
+    #wm, node_id_to_node_name = build_QueryGraph(wm)
 
     send_node_object_list=arrange_node_object_list(QueryNode.objects.all())
     edges=arrange_edge_object_list(QueryEdge.objects.all())
-    msg={'node_object_list': send_node_object_list, 'edges':edges, 'node_id_to_node_name': node_id_to_node_name, "debug_data":debug_data, "code_weight":code_weight, "data_weight":data_weight, "library_weight":library_weight, "output_weight":output_weight}
-    data=[
-        ('サンプル1', '1'),
-        ('サンプル2', '2'),
-        ('サンプル3', '3'),
-    ]
-    #msg['form'] = HelloForm(label='test_label', choices=data)
-    #msg['form'] = HelloForm()
+    msg={
+        'node_object_list': send_node_object_list, 
+        'edges':edges, 
+        #'node_id_to_node_name': node_id_to_node_name, 
+        "debug_data":request_data, 
+        "code_weight":code_weight, 
+        "data_weight":data_weight, 
+        "library_weight":library_weight, 
+        "output_weight":output_weight,
+        "uploadfile": uploadfile,
+        }
     msg['form_setting_node'] = SelectNodeForm()
+    msg['form_setting_parent_node'] = SelectParentNodeForm()
     msg['form_delete_edge'] = SelectEdgeForm()
     msg['form_setting_type'] = SelectTypeForm()
     msg['form_setting_query'] = SelectSavedQueryForm()
     msg['query_name']=""
+    msg["arranged_result"]=""
     
 
     return render(request, 'interface/index.html', msg)
 
-def form(request, *args, **kwargs):
+uploadfile={"filename":"sample_file_name"}
+def PostExport(request):
+    """
+    役職テーブルを全件検索して、CSVファイルを作成してresponseに出力します。
+    """
+    export_file_name = request.POST["export_file_name"]
+    json_file = dump_to_json(QueryNode.objects.all(), QueryEdge.objects.all(), QueryLibrary.objects.all())
+    #response = HttpResponse(open('/path/to/pdf/marketista.pdf', 'rb').read(), content_type='application/json; charset=Shift-JIS' )
+    response = HttpResponse(content_type='application/json; charset=Shift-JIS' )
+    response['Content-Disposition'] = f'attachment; filename="{export_file_name}.json"'
+    response.write(json_file)
+    return response
 
-    wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
-    debug_data=""
-    debug_data=request.POST
+
+    response = HttpResponse(content_type='text/csv; charset=Shift-JIS')
+    filename = urllib.parse.quote((u'CSVファイル.csv').encode("utf8"))
+    response['Content-Disposition'] = 'attachment; filename*=UTF-8\'\'{}'.format(filename)
+    writer = csv.writer(response)
+    for post in Post.objects.all():
+        writer.writerow([post.pk, post.name])
+    return response
+    
+def form(request, *args, **kwargs):
+    logging.info(f"Loaded \'form\' page.")
+
     request_data=request.POST
+    err_msg=""
+    uploadfile={"filename":"sample_file_name"}
     #if (request.method == 'POST'):
+    
+    if "loading_button" in request_data:
+        json_file = QueryJson.objects.filter(query_name=request_data["selected_query"])[0].query_contents
+        replace_all_using_json_log(json_file)
+    else:
+        pass
 
     if "setting_button" in request_data:
         if request_data["setting_button"] == "Delete":
-            try:
-                node_id = int(request_data["input_node_id"])
-                delete_node_safely(node_id)
-            except:
-                pass
-        else:
+            if "selected_node" in request_data:
+                try:
+                    node_id = int(request_data["selected_node"])
+                    err_msg = delete_node_safely(node_id)
+                except:
+                    pass
+            if "selected_edge" in request_data:
+                try:
+                    edge = request_data["selected_edge"].strip(' ').split(',')
+                    logging.info(f"Delete edge: parent_node_id {edge[0]}")
+                    logging.info(f"Delete edge: parent_node_id {edge[1]}")
+                    delete_edge_safely(edge)
+                except:
+                    pass
+            if "selected_query" in request_data:
+                QueryJson.objects.filter(query_name=request_data["selected_query"]).delete()
+
+        if request_data["setting_button"] in ["Set", "Add", "Change"]:
             try:
                 node_id = int(request_data["input_node_id"])
                 node_type = request_data["input_node_type"]
                 node_contents = request_data["input_node_contents"]
+                parent_node_id = int(request_data["input_parent_node_id"])
             except:
                 pass
             else:
                 new_node = QueryNode(node_id=node_id, node_type=node_type, node_contents=node_contents)
                 QueryNode.objects.filter(node_id=node_id).delete()
                 new_node.save()
+                if parent_node_id == node_id and node_id == 0:
+                    pass
+                else:
+                    new_edge = QueryEdge(parent_node_id=parent_node_id, successor_node_id=node_id)
+                    new_edge.save()
 
         if request_data["setting_button"] == "Add":
             try:
@@ -288,39 +345,47 @@ def form(request, *args, **kwargs):
     if "saving_button" in request_data:
         saving_query_name = request_data["query_name"]
         save_query(saving_query_name, QueryNode.objects.all(), QueryEdge.objects.all(), QueryLibrary.objects.all())
-    if "loading_button" in request_data:
-        pass
+        form_setting_query = SelectSavedQueryForm()
+        form_setting_query.append_choice()
+
+
 
     if "search_button" in request_data:
+        wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
+        wm, node_id_to_node_name = build_QueryGraph(wm)
         node_id_to_node_name, nb_score, send_node_object_list, arranged_result = get_result(wm)
     else:
         arranged_result=""
+        send_node_object_list=arrange_node_object_list(QueryNode.objects.all())
 
 
-            
-
-
-    wm, node_id_to_node_name = build_QueryGraph(wm)
         
-    send_node_object_list=arrange_node_object_list(QueryNode.objects.all())
     edges=arrange_edge_object_list(QueryEdge.objects.all())
 
+    #デバッグ用
+    debug_data=request_data
 
-    msg={'node_object_list': send_node_object_list, 'edges':edges,'node_id_to_node_name': node_id_to_node_name, "debug_data":debug_data, "code_weight":code_weight, "data_weight":data_weight, "library_weight":library_weight, "output_weight":output_weight}
-    """
-    data=[
-        ('サンプル1', '1'),
-        ('サンプル2', '2'),
-        ('サンプル3', '3'),
-    ]
-    msg['form'] = HelloForm(label='test_label', choices=data)
-    msg['form'] = HelloForm()
-    """
+    msg = {
+        'node_object_list': send_node_object_list, 
+        'edges':edges,
+        #'node_id_to_node_name': node_id_to_node_name, 
+        #"debug_data":request_data, 
+        "debug_data":debug_data, 
+        "code_weight":code_weight, 
+        "data_weight":data_weight, 
+        "library_weight":library_weight, 
+        "output_weight":output_weight,
+        "uploadfile": uploadfile,
+        }
+    form_setting_query = SelectSavedQueryForm()
+    form_setting_query.append_choice()
     msg['form_setting_node'] = SelectNodeForm()
+    msg['form_setting_parent_node'] = SelectParentNodeForm()
     msg['form_delete_edge'] = SelectEdgeForm()
     msg['form_setting_type'] = SelectTypeForm()
-    msg['form_setting_query'] = SelectSavedQueryForm()
+    msg['form_setting_query'] = form_setting_query
     msg['query_name']=""
+    msg['err_msg'] = err_msg
     msg["arranged_result"]=arranged_result
     return render(request, 'interface/index.html', msg)
 
@@ -688,24 +753,44 @@ def build_QueryGraph(wm):
     return wm, node_id_to_node_name
 
 
-def dump_to_json(QueryNode_object_list, QueryEdge_object_list, QueryLibrary_object_list):
+def dump_to_json_old(QueryNode_object_list, QueryEdge_object_list, QueryLibrary_object_list):
     """
     QueryNode, QueryEdge, QueryLibraryをまとめて一つのjsonファイルにする．
     """
     json_file = ""
-    json_file += "{\"QueryNode\":"
+    json_file += "{\"querynode\":"
     for QueryNode_object in QueryNode_object_list:
-        json_file += "{" + f"\"node_id\":{QueryNode_object.node_id},\"node_type\":{QueryNode_object.node_type},\"node_contents\":{QueryNode_object.node_contents}" + "}"
-    json_file += ",\"QueryEdge\":"
+        node_id = str(QueryNode_object.node_id)
+        node_type = QueryNode_object.node_type
+        node_contents = str(QueryNode_object.node_contents)
+        json_file += "{" + f"\"node_id\":{node_id},\"node_type\":{node_type},\"node_contents\":{node_contents}" + "}"
+    json_file += ",\"queryedge\":"
     for QueryEdge_object in QueryEdge_object_list:
-        json_file += "{" + f"\"parent_node_id\":{QueryEdge_object.parent_node_id},\"successor_node_id\":{QueryEdge_object.successor_node_id}" + "}"
-    json_file += ",\"QueryLibrary\":"
+        parent_node_id = str(QueryEdge_object.parent_node_id)
+        successor_node_id = str(QueryEdge_object.successor_node_id)
+        json_file += "{" + f"\"parent_node_id\":{parent_node_id},\"successor_node_id\":{successor_node_id}" + "}"
+    json_file += ",\"querylibrary\":"
     for QueryLibrary_object in QueryLibrary_object_list:
-        json_file += "{" + f"\"library_name\":{QueryLibrary_object.library_name}" + "}"
+        library_name = str(QueryLibrary_object.library_name)
+        json_file += "{" + f"\"library_name\":{library_name}" + "}"
     json_file += "}"
     return json_file
 
-def build_query_from_json(json_file):
+def dump_to_json(QueryNode_object_list, QueryEdge_object_list, QueryLibrary_object_list):
+    """
+    QueryNode, QueryEdge, QueryLibraryをまとめて一つのjsonファイルにする．
+    """
+    list2json = {"querynode":[], "queryedge":[], "querylibrary":[]}
+    for QueryNode_object in QueryNode_object_list:
+        list2json["querynode"].append({"node_id": str(QueryNode_object.node_id), "node_type": QueryNode_object.node_type, "node_contents":str(QueryNode_object.node_contents)})
+    for QueryEdge_object in QueryEdge_object_list:
+        list2json["queryedge"].append({"parent_node_id": str(QueryEdge_object.parent_node_id), "successor_node_id": QueryEdge_object.successor_node_id})
+    for QueryLibrary_object in QueryLibrary_object_list:
+        list2json["querylibrary"].append({"library_name": str(QueryLibrary_object.library_name)})
+    return json.dumps(list2json)
+
+#不使用
+def build_query_from_json_backup(json_file):
     QueryGraph = nx.DiGraph()
     dictionary = json.loads(json_file)
     #node_object_list = QueryNode.objects.all()
@@ -764,6 +849,99 @@ def build_query_from_json(json_file):
     
     logging.info("Completed!: Building a query graph.")
     return QueryGraph, query_root, query_lib, query_cell_code, query_table, node_id_to_node_name
+
+def build_query_from_json(json_file):
+    QueryGraph = nx.DiGraph()
+    dictionary = json.loads(json_file)
+    #node_object_list = QueryNode.objects.all()
+    query_cell_code={}
+    query_table={}
+
+    # ノード名設定用の変数3つ. int.
+    code_id=0
+    data_id=0
+    output_id=0
+
+    # edge設定用の{ノード番号:ノード名}の辞書. {int: string}.
+    node_id_to_node_name={}
+
+    for node in dictionary["QueryNode"]:
+        if node["node_type"]=="code":
+            node_name = f"cell_query_{code_id}"
+            QueryGraph.add_node(node_name, node_type="Cell", node_id=node["node_id"])
+            query_cell_code[node_name] = node["node_contents"]
+            node_id_to_node_name[node["node_id"]]=node_name
+            code_id+=1
+        elif node["node_type"]=="data":
+            node_name = f"query_var{data_id}"
+            QueryGraph.add_node(node_name, node_type="Var", node_id=node["node_id"])
+            query_table[node_name] = node["node_contents"]
+            node_id_to_node_name[node["node_id"]]=node_name
+            data_id+=1
+        elif node["node_type"]=="output":
+            # TODO:display_type="text"を正しい内容に変更．
+            node_name = f"query_display{data_id}"
+            QueryGraph.add_node(node_name, node_type="Display_data", display_type="text", node_id=node["node_id"])
+            node_id_to_node_name[node["node_id"]]=node_name
+            output_id+=1
+        logging.info(f"{node_name} appended to QueryGraph.")
+    
+    library_list=[]
+    for library in dictionary["QueryLibrary"]:
+        library_list.append(library["library_name"])
+    query_lib=pd.Series(library_list)
+    
+    for edge in dictionary["QueryEdge"]:
+        QueryGraph.add_edge(node_id_to_node_name[edge["parent_node_id"]], node_id_to_node_name[edge["successor_node_id"]])
+
+    query_root=None
+    root_count=0
+    for n in QueryGraph.nodes():
+        if len(list(QueryGraph.predecessors(n)))==0:
+            logging.info(f"{n} is root node.")
+            query_root = n
+            root_count+=1
+            #break
+        #logging.info(f"{n} is not root node.")
+    if root_count>1:
+        logging.info("Only a node is allowed in query graph.")
+        sys.exit(1)
+
+    wm.QueryGraph = QueryGraph
+    wm.query_root=query_root
+    wm.query_lib=query_lib
+    wm.query_cell_code=query_cell_code
+    wm.query_table=query_table
+    wm.attr_of_q_node_type = nx.get_node_attributes(wm.QueryGraph, "node_type")
+    wm.attr_of_q_real_cell_id=nx.get_node_attributes(wm.QueryGraph, "real_cell_id")
+    wm.attr_of_q_display_type=nx.get_node_attributes(wm.QueryGraph, "display_type")
+    #wm.query_workflow_info={"Cell": 3, "Var": 0, "Display_data": {"text": 1}, "max_indegree": 1, "max_outdegree": 1}
+    wm.set_query_workflow_info()
+    wm.set_query_workflow_info_Display_data()
+    
+    logging.info("Completed!: Building a query graph.")
+    return wm, node_id_to_node_name
+
+def replace_all_using_json_log(json_file):
+    delete_all()
+    dictionary = json.loads(json_file)
+    for item in dictionary["querynode"]:
+        q = QueryNode(node_id=item["node_id"], node_type=item["node_id"], node_contents=item["node_contents"])
+        q.save()
+    for item in dictionary["queryedge"]:
+        q = QueryEdge(parent_node_id=item["parent_node_id"], successor_node_id=item["successor_node_id"])
+        q.save()
+    for item in dictionary["querylibrary"]:
+        q = QueryLibrary(library_name=item["library_name"])
+        q.save()
+
+
+def delete_all():
+    QueryNode.objects.all().delete()
+    QueryEdge.objects.all().delete()
+    QueryLibrary.objects.all().delete()
+
+
 
 def save_query(saving_query_name, QueryNode_object_list, QueryEdge_object_list, QueryLibrary_object_list):
     save_json_file = dump_to_json(QueryNode_object_list, QueryEdge_object_list, QueryLibrary_object_list)

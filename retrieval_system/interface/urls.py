@@ -11,4 +11,5 @@ urlpatterns = [
     path('show_query_graph_redirect', views.show_query_graph_redirect, name='show_query_graph_redirect'),
     path('result', views.result, name='result'),
     path('make_test_formset', views.make_test_formset, name='make_test_formset'),
+    path('export/', views.PostExport, name='export')
 ]
