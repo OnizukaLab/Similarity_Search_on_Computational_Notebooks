@@ -87,6 +87,11 @@ def set_db_graph2(wm, G_in_this_nb, flg_get_db_graph):
     else:
         return wm
 
+def delete_node_safely(node_id):
+    if QueryEdge.objects.filter(parent_node_id=node_id).exists() or QueryEdge.objects.filter(successor_node_id=node_id).exists():
+        logging.info("Please delete related edges first.")
+    else:
+        QueryNode.objects.filter(node_id=node_id).delete()
     
 wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
 #wm, G_in_this_nb = get_db_graph(wm)
@@ -227,16 +232,36 @@ def form(request, *args, **kwargs):
     debug_data=request.POST
     request_data=request.POST
     #if (request.method == 'POST'):
-    try:
-        node_id = int(request_data["input_node_id"])
-        node_type = request_data["input_node_type"]
-        node_contents = request_data["input_node_contents"]
-    except:
-        pass
-    else:
-        new_node = QueryNode(node_id=node_id, node_type=node_type, node_contents=node_contents)
-        QueryNode.objects.filter(node_id=node_id).delete()
-        new_node.save()
+
+    if "setting_button" in request_data:
+        if request_data["setting_button"] == "Delete":
+            try:
+                node_id = int(request_data["input_node_id"])
+                delete_node_safely(node_id)
+            except:
+                pass
+        else:
+            try:
+                node_id = int(request_data["input_node_id"])
+                node_type = request_data["input_node_type"]
+                node_contents = request_data["input_node_contents"]
+            except:
+                pass
+            else:
+                new_node = QueryNode(node_id=node_id, node_type=node_type, node_contents=node_contents)
+                QueryNode.objects.filter(node_id=node_id).delete()
+                new_node.save()
+
+        if request_data["setting_button"] == "Add":
+            try:
+                parent_node_id = int(request_data["input_parent_node_id"])
+                successor_node_id = int(request_data["input_successor_node_id"])
+            except:
+                pass
+            else:
+                new_edge = QueryEdge(parent_node_id=parent_node_id, successor_node_id=successor_node_id)
+                new_edge.save()
+
     if "setting_weight_button" in request_data:
         try:
             code_weight=float(request_data["code_weight"])
@@ -259,16 +284,7 @@ def form(request, *args, **kwargs):
         data_weight=1.
         library_weight=1.
         output_weight=1.
-
-    try:
-        parent_node_id = int(request_data["input_parent_node_id"])
-        successor_node_id = int(request_data["input_successor_node_id"])
-    except:
-        pass
-    else:
-        new_edge = QueryEdge(parent_node_id=parent_node_id, successor_node_id=successor_node_id)
-        new_edge.save()
-
+    
     if "saving_button" in request_data:
         saving_query_name = request_data["query_name"]
         save_query(saving_query_name, QueryNode.objects.all(), QueryEdge.objects.all(), QueryLibrary.objects.all())
@@ -281,6 +297,9 @@ def form(request, *args, **kwargs):
         arranged_result=""
 
 
+            
+
+
     wm, node_id_to_node_name = build_QueryGraph(wm)
         
     send_node_object_list=arrange_node_object_list(QueryNode.objects.all())
@@ -288,13 +307,15 @@ def form(request, *args, **kwargs):
 
 
     msg={'node_object_list': send_node_object_list, 'edges':edges,'node_id_to_node_name': node_id_to_node_name, "debug_data":debug_data, "code_weight":code_weight, "data_weight":data_weight, "library_weight":library_weight, "output_weight":output_weight}
+    """
     data=[
         ('サンプル1', '1'),
         ('サンプル2', '2'),
         ('サンプル3', '3'),
     ]
-    #msg['form'] = HelloForm(label='test_label', choices=data)
-    #msg['form'] = HelloForm()
+    msg['form'] = HelloForm(label='test_label', choices=data)
+    msg['form'] = HelloForm()
+    """
     msg['form_setting_node'] = SelectNodeForm()
     msg['form_delete_edge'] = SelectEdgeForm()
     msg['form_setting_type'] = SelectTypeForm()
@@ -354,6 +375,7 @@ def form_not_use_query_database(request, *args, **kwargs):
 
     return render(request, 'interface/index.html', {'node_object_list': node_object_list, 'node_id_to_node_name': node_id_to_node_name, "debug_data":debug_data})
 
+#不使用
 def show_query_graph_redirect(request, *args, **kwargs):
     wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
     #wm.set_db_graph2(G_in_this_nb)
@@ -393,7 +415,7 @@ def show_query_graph_redirect(request, *args, **kwargs):
     # return redirect('querygraph.html', {'node_object_list': node_object_list, 'node_id_to_node_name': node_id_to_node_name, "debug_data":debug_data})
     return HttpResponseRedirect(reverse('interface:show_query_graph', args=(request)))
 
-
+#不使用
 def result_old(request):
     """
     try:
@@ -451,6 +473,7 @@ def result_old(request):
     return HttpResponse(output)
 
 
+#不使用
 def result_old2(request):
     """
     検索を行い，検索結果のページを出力する．
@@ -479,6 +502,7 @@ def result_old2(request):
     return render(request, 'interface/result.html', {'node_object_list': node_object_list, 'node_id_to_node_name': node_id_to_node_name, 'arranged_result': arranged_result})
 
 
+#不使用
 def result(request):
     """
     検索を行い，検索結果のページを出力する．
@@ -514,14 +538,17 @@ def arrange_node_object_list(node_object_list):
     send_node_object_list=[]
     for item in node_object_list:
         send_node_object_list.append({"node_id":item.node_id, "node_type": item.node_type, "node_contents": item.node_contents})
+        #send_node_object_list.append([item.node_id, item.node_type, item.node_contents])
     return send_node_object_list
 
 def arrange_edge_object_list(edge_object_list):
     send_edge_object_list=[]
     for item in edge_object_list:
         send_edge_object_list.append({"parent_node_id":item.parent_node_id, "successor_node_id":item.successor_node_id})
+        #send_edge_object_list.append([item.parent_node_id, item.successor_node_id])
     return send_edge_object_list
 
+#不使用
 def build_QueryGraph_old():
     """
     WorkflowMatchingのインスタンスを利用しない．
