@@ -28,6 +28,7 @@ form {
     padding: 0 0.5rem; 
 }
 
+
 .form_wrapper2{
     background-color: white;
     box-shadow: 0 2px 3px rgb(0 0 0 / 10%);
@@ -46,6 +47,7 @@ form {
 .for_debug{
     background-color: rgb(143, 177, 189);
     padding: 1.0rem 0; 
+    visibility: hidden;
 }
 
 .label{
@@ -120,7 +122,8 @@ form {
 
 .input_form {
     width: 100%;
-    height: 100%;
+    text-align: left;
+    padding: 0 0 2.0rem;
 }
 
 .search_button{
@@ -146,6 +149,21 @@ form {
     color: orangered;
 }
 
+.ranking{
+    display: inline-block;
+    text-align: right;
+    width: 4em;
+    padding: 0 0.3rem 0 0; 
+
+}
+
+.result{
+    font-size: 18px;
+}
+
+.search_time{
+    font-size: 12px;
+}
 
 
 

@@ -31,14 +31,89 @@
         <div class="wrap">
             <div class="wrapper">
 
+                <!-- ここから左半分 -->
                 <div class="column cat1">
                     <div class="form_wrapper1">
                         <div class="form_wrapper2">
                             <div id="graph_viz"></div>
-                            <svg width="600" height="600"></svg>
+                            <svg width=100% height="350"></svg>
                         </div>
                     </div>
+                    <br/>
+                    <div class="input_form">
+                        <div class="form_wrapper1">
+                            <div class="form_wrapper2">
+                                <div class="question">
+                                    Load query
+                                </div>
+                                <div class="answer">
+                                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+                                        {% csrf_token %}
+                                        {{ form_setting_query.as_p }}
+                                        <input type="submit" name="loading_button" value="Load"> 
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form_wrapper1">
+                            <div class="form_wrapper2">
+                                <div class="question">
+                                    Save query
+                                </div>
+                                <div class="answer">
+                                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+                                        {% csrf_token %}
+                                        <br/>
+                                        <p>Save this query to the server</p>
+                                        <label>Query name: </label>
+                                        <input type="text" name="query_name" id="query_name" value="Enter a query name">
+                                        <br/>
+                                        <input type="submit" name="saving_button" value="Save"> 
+                                    </form>
+                                    <form class="input_form2" action="{% url 'interface:export' %}" method='POST'>
+                                        <p>Export this query as "<span id="export_file_name2">{{uploadfile.filename}}</span>.json"</p>
+                                        <input type="text" name="export_file_name" id="export_file_name" value="Enter a query name">
+                                        <input type="submit" name="saving_button" value="Export"> 
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form_wrapper1">
+                            <div class="form_wrapper2">
+                                <div class="question">
+                                    Delete query
+                                </div>
+                                <div class="answer">
+                                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+                                    {% csrf_token %}
+                                        {{ form_setting_query.as_p }}
+                                        <input type="submit" name="setting_button" value="Delete"> 
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form_wrapper1">
+                            <div class="form_wrapper2">
+                                <div class="question">
+                                    Reset query
+                                </div>
+                                <div class="answer">
+                                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+                                        {% csrf_token %}
+                                        <input type="submit" name="setting_button" value="Reset"> 
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        
+                    <!-- div class="input_form" -->
+                    </div>
                 </div>
+                <!-- ここまで左半分 -->
+
 
                 <div class="column cat2">
                     <div class="input_form">
@@ -63,7 +138,7 @@
                             <div class="form_wrapper2">
                                 <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
                                     {% csrf_token %}
-                                    Configure each weight.<br/>
+                                    Configure weights<br/>
                                     <label class="label_weight">code: </label>
                                     <input type="range" id="code_weight" name="code_weight" min="0" max="10" step="0.5" value={{code_weight}}>
                                     <span id="current-code_weight">{{code_weight}}</span>
@@ -86,62 +161,12 @@
                                 </form>
                             </div>
                         </div>
-                        <div class="form_wrapper1">
-                            <div class="form_wrapper2">
-                                <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
-                                    {% csrf_token %}
-                                    Load a query.
-                                    {{ form_setting_query.as_p }}
-                                    <input type="submit" name="loading_button" value="Load"> 
-                                </form>
-                            </div>
-                        </div>
-
-                        <div class="form_wrapper1">
-                            <div class="form_wrapper2">
-                                <div class="question">
-                                    Save a query
-                                </div>
-                                <div class="answer">
-                                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
-                                        {% csrf_token %}
-                                        <br/>
-                                        <p>Save this query to the server</p>
-                                        <label>Query name: </label>
-                                        <input type="text" name="query_name" id="query_name" value="Enter a query name">
-                                        <br/>
-                                        <input type="submit" name="saving_button" value="Save"> 
-                                    </form>
-                                    <form class="input_form2" action="{% url 'interface:export' %}" method='POST'>
-                                        <p>Export this query as "<span id="export_file_name2">{{uploadfile.filename}}</span>.json"</p>
-                                        <input type="text" name="export_file_name" id="export_file_name" value="Enter a query name">
-                                        <input type="submit" name="saving_button" value="Export"> 
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="form_wrapper1">
-                            <div class="form_wrapper2">
-                                <div class="question">
-                                    Delete a query
-                                </div>
-                                <div class="answer">
-                                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
-                                    {% csrf_token %}
-                                    {{ form_setting_query.as_p }}
-                                    <input type="submit" name="setting_button" value="Delete"> 
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-
 
 
                         <div class="form_wrapper1">
                             <div class="form_wrapper2">
                                 <div class="question">
-                                Configure libraries.
+                                Configure libraries
                                 </div>
                                 <div class="answer">
                                     <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
@@ -159,7 +184,7 @@
                         <div class="form_wrapper1">
                             <div class="form_wrapper2">
                                 <div class="question">
-                                    Add/Configure a node.
+                                    Add/Configure node
                                 </div>
                                 <div class="answer">
                                     <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
@@ -184,7 +209,7 @@
                         <div class="form_wrapper1">
                             <div class="form_wrapper2">
                                 <div class="question">
-                                Delete an node.
+                                Delete node
                                 </div>
                                 <div class="answer">
                                     <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
@@ -199,7 +224,7 @@
                         <div class="form_wrapper1">
                             <div class="form_wrapper2">
                                 <div class="question">
-                                Add an edge.
+                                Add edge
                                 </div>
                                 <div class="answer">
                                     <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
@@ -216,7 +241,7 @@
                         <div class="form_wrapper1">
                             <div class="form_wrapper2">
                                 <div class="question">
-                                Delete an edge.
+                                Delete edge
                                 </div>
                                 <div class="answer">
                                     <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
@@ -240,7 +265,10 @@
     <div class="result">
         <div class="wrap">
             <h2 class="result_title">Search Results</h2>
-            {{arranged_result}}
+            <div class="search_time">({{search_time}} sec.)</div>
+            {% for item in arranged_result %}
+            <span class="ranking">{{item.rank}}  </span><a href="{{item.nb_url}}">{{item.nb_name}}</a><br/>
+            {% endfor %}
         </div>
     </div>
 

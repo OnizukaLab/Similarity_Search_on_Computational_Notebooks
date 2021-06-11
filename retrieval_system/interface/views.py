@@ -105,7 +105,12 @@ def delete_edge_safely(edge):
 wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
 if flg_get_db_graph:
     wm, G_in_this_nb = get_db_graph(wm)
-
+#initialize
+code_weight=1
+data_weight=1
+library_weight=1
+output_weight=1
+k=10
 
 
 """
@@ -204,11 +209,6 @@ def index(request, *args, **kwargs):
     wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
     request_data=request.POST
 
-    #initialize
-    code_weight=1
-    data_weight=1
-    library_weight=1
-    output_weight=1
     uploadfile={"filename":"sample_file_name"}
 
     #wm, node_id_to_node_name = build_QueryGraph(wm)
@@ -278,6 +278,9 @@ def form(request, *args, **kwargs):
         pass
 
     if "setting_button" in request_data:
+        if request_data["setting_button"] == "Reset":
+            delete_all()
+
         if request_data["setting_button"] == "Delete":
             if "selected_node" in request_data:
                 try:
@@ -300,6 +303,12 @@ def form(request, *args, **kwargs):
             try:
                 node_id = int(request_data["input_node_id"])
                 node_type = request_data["input_node_type"]
+                if str(node_type) =="0":
+                    node_type="code"
+                elif str(node_type) =="1":
+                    node_type="data"
+                elif str(node_type) =="2":
+                    node_type="output"
                 node_contents = request_data["input_node_contents"]
                 parent_node_id = int(request_data["input_parent_node_id"])
             except:
@@ -360,9 +369,11 @@ def form(request, *args, **kwargs):
 
 
     if "search_button" in request_data:
-        node_id_to_node_name, nb_score, send_node_object_list, arranged_result = get_result(wm)
+        node_id_to_node_name, nb_score, send_node_object_list, arranged_result, search_time = get_result(wm, w_c=code_weight, w_v=data_weight, w_l=library_weight, w_d=output_weight, k=k)
+        arranged_result_json = json.dumps(arranged_result)
     else:
-        arranged_result=""
+        arranged_result=[]
+        arranged_result_json=""
         send_node_object_list=arrange_node_object_list(QueryNode.objects.all())
 
 
@@ -394,6 +405,7 @@ def form(request, *args, **kwargs):
     msg['query_name']=""
     msg['err_msg'] = err_msg
     msg["arranged_result"]=arranged_result
+    msg["search_time"]=search_time
     return render(request, 'interface/index.html', msg)
 
 #不使用
@@ -592,19 +604,16 @@ def result(request):
     arranged_result = json.dumps(arranged_result)
     return render(request, 'interface/result.html', {'node_object_list': send_node_object_list, 'node_id_to_node_name': node_id_to_node_name, 'arranged_result': arranged_result})
 
-def get_result(wm):
-    wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
-    wm.set_db_graph2(G_in_this_nb)
-    #wm, G_in_this_nb = get_db_graph(wm)
-
-    wm, node_id_to_node_name = build_QueryGraph(wm)
+def get_result(wm, w_c=1, w_v=1, w_l=1, w_d=1, k=10):
+    wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path) #検索のためにobjectを初期化
+    wm.set_db_graph2(G_in_this_nb) # 検索対象を設定
+    wm, node_id_to_node_name = build_QueryGraph(wm) # クエリを設定
         
-    top_k_result, nb_score = search(wm, w_c=8, w_v=1, w_l=1, w_d=1, k=5)
+    top_k_result, nb_score, search_time = search(wm, w_c=w_c, w_v=w_v, w_l=w_l, w_d=w_d, k=k) #検索
 
     send_node_object_list=arrange_node_object_list(QueryNode.objects.all())
     arranged_result = arrange_result_dict_for_html(jupyter_notebook_localhost_number, top_k_result, dict_nb_name_and_cleaned_nb_name)
-    arranged_result = json.dumps(arranged_result)
-    return node_id_to_node_name, nb_score, send_node_object_list, arranged_result
+    return node_id_to_node_name, nb_score, send_node_object_list, arranged_result, search_time
 
 def arrange_node_object_list(node_object_list):
     send_node_object_list=[]
@@ -979,6 +988,7 @@ def searching_top_k_notebooks(wm, w_c, w_v, w_l, w_d, k, flg_chk_invalid_by_work
         flg_cache_query_table (bool)
     """
 
+    search_time_start = timeit.default_timer()    
     wm.set_k(k)
     wm.get_db_workflow_info()
     #wm.load_calculated_sim(calculated_sim_path)
@@ -1031,20 +1041,33 @@ def searching_top_k_notebooks(wm, w_c, w_v, w_l, w_d, k, flg_chk_invalid_by_work
         with open(store_nb_score_path, mode="w") as f:
             f.write(json.dumps(wm.nb_score))
         
-    return top_k_result, wm.nb_score
+    search_time_end = timeit.default_timer()    
+    search_time = search_time_end - search_time_start
+    return top_k_result, wm.nb_score, search_time
 
 
 def create_jupyter_url(jupyter_notebook_localhost_number, nb_name):
     created_url = f"http://localhost:{jupyter_notebook_localhost_number}/notebooks/{nb_name}"
     return created_url
 
-def arrange_result_dict_for_html(jupyter_notebook_localhost_number, top_k_result, dict_nb_name_and_cleaned_nb_name):
+def arrange_result_dict_for_html2(jupyter_notebook_localhost_number, top_k_result, dict_nb_name_and_cleaned_nb_name):
     arranged_result = []
     for result in top_k_result:
         nb_name = dict_nb_name_and_cleaned_nb_name[result[0]]
         nb_score = result[1]
         nb_url = create_jupyter_url(jupyter_notebook_localhost_number, nb_name)
         arranged_result.append([nb_name, nb_score, nb_url])
+    return arranged_result
+
+def arrange_result_dict_for_html(jupyter_notebook_localhost_number, top_k_result, dict_nb_name_and_cleaned_nb_name):
+    arranged_result = []
+    rank=1
+    for result in top_k_result:
+        nb_name = dict_nb_name_and_cleaned_nb_name[result[0]]
+        nb_score = result[1]
+        nb_url = create_jupyter_url(jupyter_notebook_localhost_number, nb_name)
+        arranged_result.append({"nb_name":nb_name,"nb_score":nb_score, "nb_url":nb_url, "rank":rank})
+        rank+=1
     return arranged_result
 
 def make_test_formset(request):
