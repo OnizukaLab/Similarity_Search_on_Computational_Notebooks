@@ -44,7 +44,7 @@
                     <div class="input_form">
                         <div class="form_wrapper1">
                             <div class="search_button_wrapper">
-                            <form action="{% url 'interface:result' %}" method='POST'>
+                            <form action="{% url 'interface:form' %}" method='POST'>
                                 {% csrf_token %}
                                 <input class="search_button" type="submit" name="search_button" value="SEARCH"> 
                             </form>
@@ -147,7 +147,7 @@
                                     <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
                                         {% csrf_token %}
                                         <p>Copy and paste source code with importing library</p>
-                                        <textarea name="input_node_contents" id="libraries_contents" value="" cols="50" rows="10"></textarea>
+                                        <textarea name="libraries_contents" id="libraries_contents" value="" cols="50" rows="10"></textarea>
                                         <br/>
                                         <input type="submit" name="setting_button" value="Set"> 
                                         <br/>
@@ -240,7 +240,7 @@
     <div class="result">
         <div class="wrap">
             <h2 class="result_title">Search Results</h2>
-        {{arranged_result}}
+            {{arranged_result}}
         </div>
     </div>
 

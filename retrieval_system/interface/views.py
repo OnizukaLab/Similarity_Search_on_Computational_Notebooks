@@ -36,6 +36,7 @@ from workflow_matching import WorkflowMatching
 # Global variable
 G_in_this_nb=None
 jupyter_notebook_localhost_number=8888
+flg_get_db_graph = True # 検索部分を動かすかどうか. 開発用
 
 
 # ***** initialization *****
@@ -102,8 +103,8 @@ def delete_edge_safely(edge):
     
 
 wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
-#wm, G_in_this_nb = get_db_graph(wm)
-#flg_get_db_graph = True
+if flg_get_db_graph:
+    wm, G_in_this_nb = get_db_graph(wm)
 
 
 
@@ -200,7 +201,7 @@ def form_old(request, *args, **kwargs):
 def index(request, *args, **kwargs):
     logging.info(f"Loaded \'index\' page.")
 
-    #wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
+    wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
     request_data=request.POST
 
     #initialize
@@ -240,6 +241,7 @@ uploadfile={"filename":"sample_file_name"}
 def PostExport(request):
     """
     役職テーブルを全件検索して、CSVファイルを作成してresponseに出力します。
+    参考：http://houdoukyokucho.com/2020/06/29/post-1296/，https://qiita.com/t-iguchi/items/d2862e7ef7ec7f1b07e5
     """
     export_file_name = request.POST["export_file_name"]
     json_file = dump_to_json(QueryNode.objects.all(), QueryEdge.objects.all(), QueryLibrary.objects.all())
@@ -265,6 +267,9 @@ def form(request, *args, **kwargs):
     err_msg=""
     uploadfile={"filename":"sample_file_name"}
     #if (request.method == 'POST'):
+    wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
+    wm, node_id_to_node_name = build_QueryGraph(wm)
+    wm.set_db_graph2(G_in_this_nb)
     
     if "loading_button" in request_data:
         json_file = QueryJson.objects.filter(query_name=request_data["selected_query"])[0].query_contents
@@ -291,7 +296,7 @@ def form(request, *args, **kwargs):
             if "selected_query" in request_data:
                 QueryJson.objects.filter(query_name=request_data["selected_query"]).delete()
 
-        if request_data["setting_button"] in ["Set", "Add", "Change"]:
+        if request_data["setting_button"] in ["Set", "Add", "Change"]: 
             try:
                 node_id = int(request_data["input_node_id"])
                 node_type = request_data["input_node_type"]
@@ -308,6 +313,10 @@ def form(request, *args, **kwargs):
                 else:
                     new_edge = QueryEdge(parent_node_id=parent_node_id, successor_node_id=node_id)
                     new_edge.save()
+            if "libraries_contents" in request_data:
+                libraries_contents = request_data["libraries_contents"]
+                extracted_libraries_contents = extract_library_name(libraries_contents)
+                save_libraries(extracted_libraries_contents)
 
         if request_data["setting_button"] == "Add":
             try:
@@ -351,8 +360,6 @@ def form(request, *args, **kwargs):
 
 
     if "search_button" in request_data:
-        wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
-        wm, node_id_to_node_name = build_QueryGraph(wm)
         node_id_to_node_name, nb_score, send_node_object_list, arranged_result = get_result(wm)
     else:
         arranged_result=""
@@ -683,7 +690,6 @@ def build_QueryGraph(wm):
     build_QueryGraph_oldと異なり，wmを引数として返り値もwm．
     """
     QueryGraph = nx.DiGraph()
-    node_object_list = QueryNode.objects.all()
     query_cell_code={}
     query_table={}
 
@@ -695,7 +701,7 @@ def build_QueryGraph(wm):
     # edge設定用の{ノード番号:ノード名}の辞書. {int: string}.
     node_id_to_node_name={}
 
-    for node in node_object_list:
+    for node in QueryNode.objects.all():
         if node.node_type=="code":
             node_name = f"cell_query_{code_id}"
             QueryGraph.add_node(node_name, node_type="Cell", node_id=f"{node.node_id}")
@@ -714,7 +720,7 @@ def build_QueryGraph(wm):
             QueryGraph.add_node(node_name, node_type="Display_data", display_type="text", node_id=f"{node.node_id}")
             node_id_to_node_name[node.node_id]=node_name
             output_id+=1
-        logging.info(f"{node_name} appended to QueryGraph.")
+        #logging.info(f"{node_name} appended to QueryGraph.")
     
     library_list=[]
     for library in QueryLibrary.objects.all():
@@ -1058,3 +1064,36 @@ def make_test_formset(request):
         formset = TestFormSet() # initialを渡すことができます。
         # formset = TestFormSet(initial=[{'title':'abc', 'date': '2019-01-01'},])
     return render(request, 'interface/form1.html', {'formset': formset})
+
+
+def extract_library_name(string_library):
+    library_list=[]
+
+    rows = string_library.split("\n")
+    for row in rows:
+        if row[:row.find(" ")+1]=="from":
+            row = row[row.find(" import "):]
+        else:
+            row = row[row.find("import "):]
+        if "as" in row:
+            row = row[:row.rfind(" as ")+1]
+        if "," in row:
+            for r in row.strip(" ").split(","):
+                library_list.append(r)
+        else:
+            library_list.append(row)
+    return library_list
+
+def save_libraries(libraries_list):
+    for lib_name in libraries_list:
+        q = QueryLibrary(library_name=lib_name)
+        q.save()
+
+
+
+
+
+
+
+
+
