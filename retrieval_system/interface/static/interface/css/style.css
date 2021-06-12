@@ -171,8 +171,9 @@ form {
 
 .result_inner{
     background-color: white;
-    padding: 0 0.3rem; 
+    padding: 0 0.5rem 1.0rem; 
     box-shadow: 0 2px 3px rgb(0 0 0 / 10%);
+    line-height: 105%;
 }
 
 

@@ -270,11 +270,14 @@
 
     <div class="result">
         <div class="wrap">
-            <h2 class="result_title">Search Results</h2>
-            <div class="search_time">{{search_time}}</div>
-            {% for item in arranged_result %}
-            <span class="ranking">{{item.rank}}  </span><a href="{{item.nb_url}}">{{item.nb_name}}</a><br/>
-            {% endfor %}
+            <div class="result_inner">
+                <h2 class="result_title">Search Results</h2>
+                <div class="search_time">{{search_time}}</div>
+                {% for item in arranged_result %}
+                <span class="ranking">{{item.rank}}  </span><a href="{{item.nb_url}}">{{item.nb_name}}</a><br/>
+                {% endfor %}
+                <br/>
+            </div>
         </div>
     </div>
 
