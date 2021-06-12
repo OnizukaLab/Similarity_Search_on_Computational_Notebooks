@@ -152,21 +152,28 @@ form {
 .ranking{
     display: inline-block;
     text-align: right;
-    width: 4em;
+    width: 2em;
     padding: 0 0.3rem 0 0; 
 
 }
 
 .result{
     font-size: 18px;
+    width: 100%;
 }
 
 .search_time{
     font-size: 12px;
+    padding: 0 0.3rem 0 0; 
+    visibility: hidden;
 }
 
 
-
+.result_inner{
+    background-color: white;
+    padding: 0 0.3rem; 
+    box-shadow: 0 2px 3px rgb(0 0 0 / 10%);
+}
 
 
 

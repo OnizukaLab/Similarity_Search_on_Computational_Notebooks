@@ -52,6 +52,11 @@
                                         {{ form_setting_query.as_p }}
                                         <input type="submit" name="loading_button" value="Load"> 
                                     </form>
+                                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+                                        {% csrf_token %}
+                                        {{ form_upload_query.as_p }}
+                                        <input type="submit" name="loading_button" value="Load"> 
+                                    </form>
                                 </div>
                             </div>
                         </div>
@@ -72,6 +77,7 @@
                                         <input type="submit" name="saving_button" value="Save"> 
                                     </form>
                                     <form class="input_form2" action="{% url 'interface:export' %}" method='POST'>
+                                        {% csrf_token %}
                                         <p>Export this query as "<span id="export_file_name2">{{uploadfile.filename}}</span>.json"</p>
                                         <input type="text" name="export_file_name" id="export_file_name" value="Enter a query name">
                                         <input type="submit" name="saving_button" value="Export"> 
@@ -265,7 +271,7 @@
     <div class="result">
         <div class="wrap">
             <h2 class="result_title">Search Results</h2>
-            <div class="search_time">({{search_time}} sec.)</div>
+            <div class="search_time">{{search_time}}</div>
             {% for item in arranged_result %}
             <span class="ranking">{{item.rank}}  </span><a href="{{item.nb_url}}">{{item.nb_name}}</a><br/>
             {% endfor %}

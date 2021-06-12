@@ -14,7 +14,7 @@ from django.views import generic
 from django.utils import timezone
 
 from .models import QueryLibrary, QueryNode, QueryEdge, QueryJson
-from .forms import HelloForm, SelectNodeForm, SelectEdgeForm, SelectTypeForm, SelectSavedQueryForm, SelectParentNodeForm
+from .forms import HelloForm, SelectNodeForm, SelectEdgeForm, SelectTypeForm, SelectSavedQueryForm, SelectParentNodeForm, UploadQueryFileForm, UploadTableDataFileForm
 
 
 current_dir=os.getcwd()
@@ -206,7 +206,7 @@ def form_old(request, *args, **kwargs):
 def index(request, *args, **kwargs):
     logging.info(f"Loaded \'index\' page.")
 
-    wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
+    #wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
     request_data=request.POST
 
     uploadfile={"filename":"sample_file_name"}
@@ -233,6 +233,8 @@ def index(request, *args, **kwargs):
     msg['form_setting_query'] = SelectSavedQueryForm()
     msg['query_name']=""
     msg["arranged_result"]=""
+    msg["form_upload_query"] = UploadQueryFileForm()
+    msg["form_upload_data"] = UploadTableDataFileForm()
     
 
     return render(request, 'interface/index.html', msg)
@@ -265,11 +267,9 @@ def form(request, *args, **kwargs):
 
     request_data=request.POST
     err_msg=""
+    search_time=0
     uploadfile={"filename":"sample_file_name"}
     #if (request.method == 'POST'):
-    wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
-    wm, node_id_to_node_name = build_QueryGraph(wm)
-    wm.set_db_graph2(G_in_this_nb)
     
     if "loading_button" in request_data:
         json_file = QueryJson.objects.filter(query_name=request_data["selected_query"])[0].query_contents
@@ -369,8 +369,11 @@ def form(request, *args, **kwargs):
 
 
     if "search_button" in request_data:
+        wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
+        wm, node_id_to_node_name = build_QueryGraph(wm)
+        wm.set_db_graph2(G_in_this_nb)
         node_id_to_node_name, nb_score, send_node_object_list, arranged_result, search_time = get_result(wm, w_c=code_weight, w_v=data_weight, w_l=library_weight, w_d=output_weight, k=k)
-        arranged_result_json = json.dumps(arranged_result)
+        #arranged_result_json = json.dumps(arranged_result) #デバッグ用
     else:
         arranged_result=[]
         arranged_result_json=""
@@ -405,7 +408,12 @@ def form(request, *args, **kwargs):
     msg['query_name']=""
     msg['err_msg'] = err_msg
     msg["arranged_result"]=arranged_result
-    msg["search_time"]=search_time
+    if search_time == 0:
+        msg["search_time"]=""
+    else:
+        msg["search_time"]=f"({round(search_time,1)} sec.)"
+    msg["form_upload_query"] = UploadQueryFileForm()
+
     return render(request, 'interface/index.html', msg)
 
 #不使用
@@ -941,7 +949,7 @@ def replace_all_using_json_log(json_file):
     delete_all()
     dictionary = json.loads(json_file)
     for item in dictionary["querynode"]:
-        q = QueryNode(node_id=item["node_id"], node_type=item["node_id"], node_contents=item["node_contents"])
+        q = QueryNode(node_id=item["node_id"], node_type=item["node_type"], node_contents=item["node_contents"])
         q.save()
     for item in dictionary["queryedge"]:
         q = QueryEdge(parent_node_id=item["parent_node_id"], successor_node_id=item["successor_node_id"])
