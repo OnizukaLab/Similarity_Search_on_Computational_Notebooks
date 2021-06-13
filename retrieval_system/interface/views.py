@@ -36,7 +36,7 @@ from workflow_matching import WorkflowMatching
 # Global variable
 G_in_this_nb=None
 jupyter_notebook_localhost_number=8888
-flg_get_db_graph = True # 検索部分を動かすかどうか. 開発用
+flg_get_db_graph = False # 検索部分を動かすかどうか. 開発用
 
 
 # ***** initialization *****

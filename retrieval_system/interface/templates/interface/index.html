@@ -515,7 +515,11 @@ function drawgraph(){
         tooltip_contents += "<br><span class='tooltip_wrap1'>node type :</span>";
         tooltip_contents += node_object_list[ind].node_type;
         tooltip_contents += "<br><span class='tooltip_wrap1'>node contents :</span><span class='tooltip_wrap2'>";
-        tooltip_contents += node_object_list[ind].node_contents.replace("\n", "<br/>");
+        var contents = node_object_list[ind].node_contents;
+        while(contents.match("\n")){
+            contents = contents.replace("\n", "<br/>");
+        }
+        tooltip_contents += contents;
         tooltip_contents += "</span>";
         if (tooltip_contents.length > TOOLTIP_MAX_TEXT_LENGTH){
             tooltip_contents = tooltip_contents.substr( 0, TOOLTIP_MAX_TEXT_LENGTH );
