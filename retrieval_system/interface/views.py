@@ -5,6 +5,7 @@ import logging
 import json
 import os
 import timeit
+import io
 
 from django import http, forms
 from django.http.response import HttpResponse, HttpResponseRedirect
@@ -36,7 +37,7 @@ from workflow_matching import WorkflowMatching
 # Global variable
 G_in_this_nb=None
 jupyter_notebook_localhost_number=8888
-flg_get_db_graph = False # 検索部分を動かすかどうか. 開発用
+flg_get_db_graph = True # 検索部分を動かすかどうか. 開発用
 
 
 # ***** initialization *****
@@ -269,6 +270,8 @@ def form(request, *args, **kwargs):
     err_msg=""
     search_time=0
     uploadfile={"filename":"sample_file_name"}
+    #デバッグ用
+    debug_data=request_data
     #if (request.method == 'POST'):
     
     if "loading_button" in request_data:
@@ -296,6 +299,11 @@ def form(request, *args, **kwargs):
                     delete_edge_safely(edge)
                 except:
                     pass
+            if "libraries_contents" in request_data:
+                libraries_contents = request_data["libraries_contents"]
+                library_list=libraries_contents.strip(" ").split(",")
+                for item in library_list:
+                    QueryLibrary.objects.filter(library_name=item).delete()
             if "selected_query" in request_data:
                 QueryJson.objects.filter(query_name=request_data["selected_query"]).delete()
 
@@ -303,12 +311,6 @@ def form(request, *args, **kwargs):
             try:
                 node_id = int(request_data["input_node_id"])
                 node_type = request_data["input_node_type"]
-                if str(node_type) =="0":
-                    node_type="code"
-                elif str(node_type) =="1":
-                    node_type="data"
-                elif str(node_type) =="2":
-                    node_type="output"
                 node_contents = request_data["input_node_contents"]
                 parent_node_id = int(request_data["input_parent_node_id"])
             except:
@@ -373,8 +375,12 @@ def form(request, *args, **kwargs):
         wm, node_id_to_node_name = build_QueryGraph(wm)
         wm.set_db_graph2(G_in_this_nb)
         node_id_to_node_name, nb_score, send_node_object_list, arranged_result, search_time = get_result(wm, w_c=code_weight, w_v=data_weight, w_l=library_weight, w_d=output_weight, k=k)
+        debug_data=json.dumps(wm.query_workflow_info)
         #arranged_result_json = json.dumps(arranged_result) #デバッグ用
     else:
+        wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
+        wm, node_id_to_node_name = build_QueryGraph(wm)
+        debug_data=json.dumps(wm.query_workflow_info)
         arranged_result=[]
         arranged_result_json=""
         send_node_object_list=arrange_node_object_list(QueryNode.objects.all())
@@ -383,8 +389,6 @@ def form(request, *args, **kwargs):
         
     edges=arrange_edge_object_list(QueryEdge.objects.all())
 
-    #デバッグ用
-    debug_data=request_data
 
     msg = {
         'node_object_list': send_node_object_list, 
@@ -408,6 +412,10 @@ def form(request, *args, **kwargs):
     msg['query_name']=""
     msg['err_msg'] = err_msg
     msg["arranged_result"]=arranged_result
+    libraries_list=[]
+    for item in QueryLibrary.objects.all():
+        libraries_list.append(item.library_name)
+    msg["libraries_list"]=json.dumps(libraries_list)
     if search_time == 0:
         msg["search_time"]=""
     else:
@@ -714,31 +722,63 @@ def build_QueryGraph(wm):
     code_id=0
     data_id=0
     output_id=0
+    reachability_id=0
 
     # edge設定用の{ノード番号:ノード名}の辞書. {int: string}.
     node_id_to_node_name={}
+    query_workflow_info={"Cell": 0, "Var": 0, "Display_data": {"all":0}, "max_indegree": 0, "max_outdegree": 0}
 
     for node in QueryNode.objects.all():
         if node.node_type=="code":
             node_name = f"cell_query_{code_id}"
-            QueryGraph.add_node(node_name, node_type="Cell", node_id=f"{node.node_id}")
+            QueryGraph.add_node(node_name, node_type="Cell", node_id=f"{node.node_id}", real_cell_id=f"{code_id}")
             query_cell_code[node_name] = node.node_contents
             node_id_to_node_name[node.node_id]=node_name
             code_id+=1
+            query_workflow_info["Cell"]+=1
         elif node.node_type=="data":
             node_name = f"query_var{data_id}"
-            QueryGraph.add_node(node_name, node_type="Var", node_id=f"{node.node_id}")
-            query_table[node_name] = node.node_contents
+            QueryGraph.add_node(node_name, node_type="Var", node_id=f"{node.node_id}", data_type="pandas.core.frame.DataFrame")
+            query_table[node_name] = pd.read_csv(io.StringIO(str(node.node_contents)), header=0)
+            logging.info(query_table.keys())
             node_id_to_node_name[node.node_id]=node_name
             data_id+=1
-        elif node.node_type=="output":
-            # TODO:display_type="text"を正しい内容に変更．
-            node_name = f"query_display{data_id}"
+            query_workflow_info["Var"]+=1
+        elif node.node_type=="text_output":
+            node_name = f"query_display{output_id}"
             QueryGraph.add_node(node_name, node_type="Display_data", display_type="text", node_id=f"{node.node_id}")
             node_id_to_node_name[node.node_id]=node_name
             output_id+=1
+            if "text" not in query_workflow_info["Display_data"]:
+                query_workflow_info["Display_data"]["text"]=0
+            query_workflow_info["Display_data"]+=1
+            query_workflow_info["Display_data"]["all"]+=1
+        elif node.node_type=="figure_output":
+            node_name = f"query_display{output_id}"
+            QueryGraph.add_node(node_name, node_type="Display_data", display_type="png", node_id=f"{node.node_id}")
+            node_id_to_node_name[node.node_id]=node_name
+            output_id+=1
+            if "png" not in query_workflow_info["Display_data"]:
+                query_workflow_info["Display_data"]["png"]=0
+            query_workflow_info["Display_data"]+=1
+            query_workflow_info["Display_data"]["all"]+=1
+        elif node.node_type=="table_output":
+            node_name = f"query_display{output_id}"
+            QueryGraph.add_node(node_name, node_type="Display_data", display_type="DataFrame", node_id=f"{node.node_id}")
+            node_id_to_node_name[node.node_id]=node_name
+            output_id+=1
+            if "DataFrame" not in query_workflow_info["Display_data"]:
+                query_workflow_info["Display_data"]["DataFrame"]=0
+            query_workflow_info["Display_data"]+=1
+            query_workflow_info["Display_data"]["all"]+=1
+        elif node.node_type=="reachability":
+            node_name = f"wildcard_{reachability_id}"
+            QueryGraph.add_node(f"wildcard_{reachability_id}", node_type="AnyWildcard", node_id=f"{node.node_id}")
+            node_id_to_node_name[node.node_id]=node_name
+            reachability_id+=1
         #logging.info(f"{node_name} appended to QueryGraph.")
     
+
     library_list=[]
     for library in QueryLibrary.objects.all():
         library_list.append(library.library_name)
@@ -746,6 +786,18 @@ def build_QueryGraph(wm):
     
     for edge in QueryEdge.objects.all():
         QueryGraph.add_edge(node_id_to_node_name[edge.parent_node_id], node_id_to_node_name[edge.successor_node_id])
+
+    # Set max_indegree and max_outdegree
+    for n in QueryGraph.nodes():
+        indegree=0
+        for i in QueryGraph.predecessors(n):
+            indegree+=1
+        query_workflow_info["max_indegree"]=max(indegree, query_workflow_info["max_indegree"])
+        
+        outdegree=0
+        for i in QueryGraph.successors(n):
+            outdegree+=1
+        query_workflow_info["max_outdegree"]=max(outdegree, query_workflow_info["max_outdegree"])
 
     query_root=None
     root_count=0
@@ -769,13 +821,15 @@ def build_QueryGraph(wm):
     wm.attr_of_q_real_cell_id=nx.get_node_attributes(wm.QueryGraph, "real_cell_id")
     wm.attr_of_q_display_type=nx.get_node_attributes(wm.QueryGraph, "display_type")
     #wm.query_workflow_info={"Cell": 3, "Var": 0, "Display_data": {"text": 1}, "max_indegree": 1, "max_outdegree": 1}
-    wm.set_query_workflow_info()
-    wm.set_query_workflow_info_Display_data()
+    #wm.set_query_workflow_info()
+    wm.query_workflow_info=query_workflow_info
+    #wm.set_query_workflow_info_Display_data()
 
     logging.info("Completed!: Building a query graph.")
     return wm, node_id_to_node_name
 
 
+#不使用
 def dump_to_json_old(QueryNode_object_list, QueryEdge_object_list, QueryLibrary_object_list):
     """
     QueryNode, QueryEdge, QueryLibraryをまとめて一つのjsonファイルにする．
@@ -812,139 +866,6 @@ def dump_to_json(QueryNode_object_list, QueryEdge_object_list, QueryLibrary_obje
         list2json["querylibrary"].append({"library_name": str(QueryLibrary_object.library_name)})
     return json.dumps(list2json)
 
-#不使用
-def build_query_from_json_backup(json_file):
-    QueryGraph = nx.DiGraph()
-    dictionary = json.loads(json_file)
-    #node_object_list = QueryNode.objects.all()
-    query_cell_code={}
-    query_table={}
-
-    # ノード名設定用の変数3つ. int.
-    code_id=0
-    data_id=0
-    output_id=0
-
-    # edge設定用の{ノード番号:ノード名}の辞書. {int: string}.
-    node_id_to_node_name={}
-
-    for node in dictionary["QueryNode"]:
-        if node["node_type"]=="code":
-            node_name = f"cell_query_{code_id}"
-            QueryGraph.add_node(node_name, node_type="Cell", node_id=node["node_id"])
-            query_cell_code[node_name] = node["node_contents"]
-            node_id_to_node_name[node["node_id"]]=node_name
-            code_id+=1
-        elif node["node_type"]=="data":
-            node_name = f"query_var{data_id}"
-            QueryGraph.add_node(node_name, node_type="Var", node_id=node["node_id"])
-            query_table[node_name] = node["node_contents"]
-            node_id_to_node_name[node["node_id"]]=node_name
-            data_id+=1
-        elif node["node_type"]=="output":
-            # TODO:display_type="text"を正しい内容に変更．
-            node_name = f"query_display{data_id}"
-            QueryGraph.add_node(node_name, node_type="Display_data", display_type="text", node_id=node["node_id"])
-            node_id_to_node_name[node["node_id"]]=node_name
-            output_id+=1
-        logging.info(f"{node_name} appended to QueryGraph.")
-    
-    library_list=[]
-    for library in dictionary["QueryLibrary"]:
-        library_list.append(library["library_name"])
-    query_lib=pd.Series(library_list)
-    
-    for edge in dictionary["QueryEdge"]:
-        QueryGraph.add_edge(node_id_to_node_name[edge["parent_node_id"]], node_id_to_node_name[edge["successor_node_id"]])
-
-    query_root=None
-    root_count=0
-    for n in QueryGraph.nodes():
-        if len(list(QueryGraph.predecessors(n)))==0:
-            logging.info(f"{n} is root node.")
-            query_root = n
-            root_count+=1
-            #break
-        #logging.info(f"{n} is not root node.")
-    if root_count>1:
-        logging.info("Only a node is allowed in query graph.")
-        sys.exit(1)
-    
-    logging.info("Completed!: Building a query graph.")
-    return QueryGraph, query_root, query_lib, query_cell_code, query_table, node_id_to_node_name
-
-def build_query_from_json(json_file):
-    QueryGraph = nx.DiGraph()
-    dictionary = json.loads(json_file)
-    #node_object_list = QueryNode.objects.all()
-    query_cell_code={}
-    query_table={}
-
-    # ノード名設定用の変数3つ. int.
-    code_id=0
-    data_id=0
-    output_id=0
-
-    # edge設定用の{ノード番号:ノード名}の辞書. {int: string}.
-    node_id_to_node_name={}
-
-    for node in dictionary["QueryNode"]:
-        if node["node_type"]=="code":
-            node_name = f"cell_query_{code_id}"
-            QueryGraph.add_node(node_name, node_type="Cell", node_id=node["node_id"])
-            query_cell_code[node_name] = node["node_contents"]
-            node_id_to_node_name[node["node_id"]]=node_name
-            code_id+=1
-        elif node["node_type"]=="data":
-            node_name = f"query_var{data_id}"
-            QueryGraph.add_node(node_name, node_type="Var", node_id=node["node_id"])
-            query_table[node_name] = node["node_contents"]
-            node_id_to_node_name[node["node_id"]]=node_name
-            data_id+=1
-        elif node["node_type"]=="output":
-            # TODO:display_type="text"を正しい内容に変更．
-            node_name = f"query_display{data_id}"
-            QueryGraph.add_node(node_name, node_type="Display_data", display_type="text", node_id=node["node_id"])
-            node_id_to_node_name[node["node_id"]]=node_name
-            output_id+=1
-        logging.info(f"{node_name} appended to QueryGraph.")
-    
-    library_list=[]
-    for library in dictionary["QueryLibrary"]:
-        library_list.append(library["library_name"])
-    query_lib=pd.Series(library_list)
-    
-    for edge in dictionary["QueryEdge"]:
-        QueryGraph.add_edge(node_id_to_node_name[edge["parent_node_id"]], node_id_to_node_name[edge["successor_node_id"]])
-
-    query_root=None
-    root_count=0
-    for n in QueryGraph.nodes():
-        if len(list(QueryGraph.predecessors(n)))==0:
-            logging.info(f"{n} is root node.")
-            query_root = n
-            root_count+=1
-            #break
-        #logging.info(f"{n} is not root node.")
-    if root_count>1:
-        logging.info("Only a node is allowed in query graph.")
-        sys.exit(1)
-
-    wm.QueryGraph = QueryGraph
-    wm.query_root=query_root
-    wm.query_lib=query_lib
-    wm.query_cell_code=query_cell_code
-    wm.query_table=query_table
-    wm.attr_of_q_node_type = nx.get_node_attributes(wm.QueryGraph, "node_type")
-    wm.attr_of_q_real_cell_id=nx.get_node_attributes(wm.QueryGraph, "real_cell_id")
-    wm.attr_of_q_display_type=nx.get_node_attributes(wm.QueryGraph, "display_type")
-    #wm.query_workflow_info={"Cell": 3, "Var": 0, "Display_data": {"text": 1}, "max_indegree": 1, "max_outdegree": 1}
-    wm.set_query_workflow_info()
-    wm.set_query_workflow_info_Display_data()
-    
-    logging.info("Completed!: Building a query graph.")
-    return wm, node_id_to_node_name
-
 def replace_all_using_json_log(json_file):
     delete_all()
     dictionary = json.loads(json_file)
@@ -972,7 +893,7 @@ def save_query(saving_query_name, QueryNode_object_list, QueryEdge_object_list, 
     q_json.save()
 
 def search(wm, w_c, w_v, w_l, w_d, k, flg_chk_invalid_by_workflow_structure=True, flg_flg_prune_under_sim=True, flg_optimize_calc_order=True, flg_caching=True, flg_calc_data_sim_approximately=False, flg_cache_query_table=False, save_running_time=False):
-    return searching_top_k_notebooks(wm, w_c, w_v, w_l, w_d, k, flg_chk_invalid_by_workflow_structure=flg_chk_invalid_by_workflow_structure, flg_flg_prune_under_sim=flg_flg_prune_under_sim, flg_optimize_calc_order=flg_optimize_calc_order, flg_caching=flg_caching, flg_calc_data_sim_approximately=flg_calc_data_sim_approximately, flg_cache_query_table=flg_cache_query_table, save_running_time=save_running_time)
+    return searching_top_k_notebooks(wm, w_c=w_c, w_v=w_v, w_l=w_l, w_d=w_d, k=k, flg_chk_invalid_by_workflow_structure=flg_chk_invalid_by_workflow_structure, flg_flg_prune_under_sim=flg_flg_prune_under_sim, flg_optimize_calc_order=flg_optimize_calc_order, flg_caching=flg_caching, flg_calc_data_sim_approximately=flg_calc_data_sim_approximately, flg_cache_query_table=flg_cache_query_table, save_running_time=save_running_time)
    
 
 # 時間計測あり 提案手法
@@ -1058,15 +979,6 @@ def create_jupyter_url(jupyter_notebook_localhost_number, nb_name):
     created_url = f"http://localhost:{jupyter_notebook_localhost_number}/notebooks/{nb_name}"
     return created_url
 
-def arrange_result_dict_for_html2(jupyter_notebook_localhost_number, top_k_result, dict_nb_name_and_cleaned_nb_name):
-    arranged_result = []
-    for result in top_k_result:
-        nb_name = dict_nb_name_and_cleaned_nb_name[result[0]]
-        nb_score = result[1]
-        nb_url = create_jupyter_url(jupyter_notebook_localhost_number, nb_name)
-        arranged_result.append([nb_name, nb_score, nb_url])
-    return arranged_result
-
 def arrange_result_dict_for_html(jupyter_notebook_localhost_number, top_k_result, dict_nb_name_and_cleaned_nb_name):
     arranged_result = []
     rank=1
@@ -1099,24 +1011,40 @@ def make_test_formset(request):
 
 def extract_library_name(string_library):
     library_list=[]
+    string_library = string_library.replace("\r", "")
+    while("\n\n" in string_library):
+        string_library = string_library.replace("\n\n", "\n")
 
     rows = string_library.split("\n")
     for row in rows:
-        if row[:row.find(" ")+1]=="from":
-            row = row[row.find(" import "):]
+        if "import " in row:
+            pass
         else:
-            row = row[row.find("import "):]
-        if "as" in row:
+            continue
+        if "#" in row:
+            row = row[:row.find("#")]
+        if row[:row.find(" ")+1]=="from":
+            row = row[row.find(" import ")+8:]
+        else:
+            row = row[row.find("import ")+7:]
+        if " as " in row:
             row = row[:row.rfind(" as ")+1]
+
+        row = row.replace(" ", "")
+
         if "," in row:
-            for r in row.strip(" ").split(","):
+            r_list=row.split(",")
+            for r in r_list:
                 library_list.append(r)
         else:
             library_list.append(row)
+
     return library_list
 
 def save_libraries(libraries_list):
     for lib_name in libraries_list:
+        if QueryLibrary.objects.filter(library_name=lib_name).exists():
+            continue
         q = QueryLibrary(library_name=lib_name)
         q.save()
 

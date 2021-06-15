@@ -1596,6 +1596,7 @@ class WorkflowMatching:
             else:
                 self.ArtificalG.add_edge(nA, nB)
 
+    #不使用？
     def set_query_workflow_info(self):
         self.query_workflow_info={"Cell": 0, "Var": 0, "Display_data": {"all":0}, "max_indegree": 0, "max_outdegree": 0}
         for n in self.QueryGraph.nodes():
@@ -1617,7 +1618,10 @@ class WorkflowMatching:
                 self.query_workflow_info[node_type][display_type]+=1
                 self.query_workflow_info["Display_data"]["all"]+=1
                 continue
-            self.query_workflow_info[node_type]+=1
+            if node_type=="AnyWildcard":
+                pass
+            else:
+                self.query_workflow_info[node_type]+=1
 
     def set_query_workflow_info_Display_data(self):
         sum_i=0

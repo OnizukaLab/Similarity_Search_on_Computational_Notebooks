@@ -144,7 +144,7 @@
                             <div class="form_wrapper2">
                                 <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
                                     {% csrf_token %}
-                                    Configure weights<br/>
+                                    Set weights<br/>
                                     <label class="label_weight">code: </label>
                                     <input type="range" id="code_weight" name="code_weight" min="0" max="10" step="0.5" value={{code_weight}}>
                                     <span id="current-code_weight">{{code_weight}}</span>
@@ -172,15 +172,18 @@
                         <div class="form_wrapper1">
                             <div class="form_wrapper2">
                                 <div class="question">
-                                Configure libraries
+                                Set libraries
                                 </div>
                                 <div class="answer">
                                     <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
                                         {% csrf_token %}
+                                        {{libraries_list}}
                                         <p>Copy and paste source code with importing library</p>
                                         <textarea name="libraries_contents" id="libraries_contents" value="" cols="50" rows="10"></textarea>
                                         <br/>
-                                        <input type="submit" name="setting_button" value="Set"> 
+                                        <input type="submit" name="setting_button" value="Set">
+                                        <br/>
+                                        <input type="submit" name="setting_button" value="Delete">
                                         <br/>
                                     </form>
                                 </div>
@@ -190,7 +193,7 @@
                         <div class="form_wrapper1">
                             <div class="form_wrapper2">
                                 <div class="question">
-                                    Add/Configure node
+                                    Set node
                                 </div>
                                 <div class="answer">
                                     <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
@@ -198,7 +201,7 @@
                                         <label>node id</label>
                                         <input type="number" min="0" max="100" name="input_node_id" value="0" id="add_or_change_input">
                                         {{ form_setting_type.as_p }}
-                                        <br/>node contents:
+                                        <br/>property:
                                         <br/>
                                         <textarea name="input_node_contents" id="input_node_contents" value="" cols="50" rows="10"></textarea>
                                         <br/>
@@ -230,7 +233,7 @@
                         <div class="form_wrapper1">
                             <div class="form_wrapper2">
                                 <div class="question">
-                                Add edge
+                                Set edge
                                 </div>
                                 <div class="answer">
                                     <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
@@ -512,9 +515,9 @@ function drawgraph(){
         var ind = d.index;
         var tooltip_contents = "<span class='tooltip_wrap1'>node id :</span>";
         tooltip_contents += JSON.stringify(node_object_list[ind].node_id);
-        tooltip_contents += "<br><span class='tooltip_wrap1'>node type :</span>";
+        tooltip_contents += "<br><span class='tooltip_wrap1'>type :</span>";
         tooltip_contents += node_object_list[ind].node_type;
-        tooltip_contents += "<br><span class='tooltip_wrap1'>node contents :</span><span class='tooltip_wrap2'>";
+        tooltip_contents += "<br><span class='tooltip_wrap1'>property :</span><span class='tooltip_wrap2'>";
         var contents = node_object_list[ind].node_contents;
         while(contents.match("\n")){
             contents = contents.replace("\n", "<br/>");

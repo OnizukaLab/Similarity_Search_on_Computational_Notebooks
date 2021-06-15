@@ -51,15 +51,18 @@ class SelectTypeForm(forms.Form):
     data=[
         ('code', 'code'),
         ('data', 'data'),
-        ('output', 'output'),
+        ('text_output', 'text output'),
+        ('figure_output', 'figure output'),
+        ('table_output', 'table_output'),
+        ('reachability', 'reachability'),
     ]
-    input_node_type = forms.ChoiceField(label='Type',choices=data)
+    input_node_type = forms.ChoiceField(label='type',choices=data)
 
 class SelectSavedQueryForm(forms.Form):
     data=[]
     for query in QueryJson.objects.all():
         data.append((query.query_name, query.query_name))
-    selected_query = forms.ChoiceField(label='Query',choices=data)
+    selected_query = forms.ChoiceField(label='query',choices=data)
     def append_choice(self):
         data=[]
         for query in QueryJson.objects.all():
