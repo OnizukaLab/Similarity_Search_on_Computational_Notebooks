@@ -3895,8 +3895,9 @@ class WorkflowMatching:
             next_db_list_tmp=list(set(next_db_list_tmp))
             next_db_list=[]
             for n in next_db_list_tmp:
-                if self.attr_of_db_node_type[n]=="Cell":
-                    next_db_list.append(n)
+                next_db_list.append(n)
+                #if self.attr_of_db_node_type[n]=="Cell":
+                #    next_db_list.append(n)
         else:
             next_db_list=list(self.G.successors(snode_db))
 
