@@ -372,8 +372,6 @@ def form(request, *args, **kwargs):
 
     if "search_button" in request_data:
         wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
-        wm, node_id_to_node_name = build_QueryGraph(wm)
-        wm.set_db_graph2(G_in_this_nb)
         node_id_to_node_name, nb_score, send_node_object_list, arranged_result, search_time = get_result(wm, w_c=code_weight, w_v=data_weight, w_l=library_weight, w_d=output_weight, k=k)
         debug_data=json.dumps(wm.query_workflow_info)
         #arranged_result_json = json.dumps(arranged_result) #デバッグ用
@@ -402,13 +400,12 @@ def form(request, *args, **kwargs):
         "output_weight":output_weight,
         "uploadfile": uploadfile,
         }
-    form_setting_query = SelectSavedQueryForm()
-    form_setting_query.append_choice()
-    msg['form_setting_node'] = SelectNodeForm()
-    msg['form_setting_parent_node'] = SelectParentNodeForm()
-    msg['form_delete_edge'] = SelectEdgeForm()
-    msg['form_setting_type'] = SelectTypeForm()
-    msg['form_setting_query'] = form_setting_query
+        
+    msg['form_setting_node'] = SelectNodeForm().append_choice()
+    msg['form_setting_parent_node'] = SelectParentNodeForm().append_choice()
+    msg['form_delete_edge'] = SelectEdgeForm().append_choice()
+    msg['form_setting_type'] = SelectTypeForm().append_choice()
+    msg['form_setting_query'] = SelectSavedQueryForm().append_choice()
     msg['query_name']=""
     msg['err_msg'] = err_msg
     msg["arranged_result"]=arranged_result
