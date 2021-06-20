@@ -7,7 +7,7 @@ Our system uses PostgreSQL and Neo4j as DBMS. Our system also uses [Juneau](http
 Before searching, transformed computational notebooks must be stored into them.
 The sample data is now in preparation.
 
-## Start the web interface
+## Preparation
 
 First, make a "similarity_retrieval_system" directory and clone our system into the directory.
 
@@ -35,6 +35,9 @@ Then clone Juneau into the same hierarchy to "similarity_retrieval_system" as fo
 
 └── juneau
 
+## Start the web interface
+
+Start PostgreSQL and Neo4J with the databases that have transformed computational notebooks.
 
 To start the web interface, go to the "similarity_retrieval_system/retrieval_system" directory and run the following command:
 ```
