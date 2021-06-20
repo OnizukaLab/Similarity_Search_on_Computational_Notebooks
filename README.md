@@ -52,6 +52,8 @@ To start the web interface, go to the "similarity_retrieval_system/retrieval_sys
 python manage.py runserver
 ```
 
+You can access the `localhost:8000` and you can use the interface.
+
 If you want to change the server's port, this command starts the server on port 8080:
 ```
 python manage.py runserver 8080
