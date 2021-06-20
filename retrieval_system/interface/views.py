@@ -21,7 +21,8 @@ from .forms import HelloForm, SelectNodeForm, SelectEdgeForm, SelectTypeForm, Se
 current_dir=os.getcwd()
 #search_engine_path="/Users/misato/Desktop/my_code" # 以前Jupyterで動かしていた方（卒論用の実験）, コピー時点で内容は同じ
 search_engine_path=f"{current_dir}/interface/retrieval_engine_module"
-juneau_file_path="/Users/misato/Desktop/my_code/juneau_copy" # 以前Jupyterで動かしていた方（卒論用の実験）, コピー時点で内容は同じ
+upper_dir=current_dir[:current_dir.rfind("similarity_retrieval_system/")]
+juneau_file_path=f"{upper_dir}/juneau_copy" # 以前Jupyterで動かしていた方（卒論用の実験）, コピー時点で内容は同じ
 #juneau_file_path=f"{current_dir}/interface/retrieval_engine_module/juneau_copy"
 sys.path.append(search_engine_path)
 sys.path.append(f"{search_engine_path}/mymodule")
