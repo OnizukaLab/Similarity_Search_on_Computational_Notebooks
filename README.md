@@ -18,13 +18,21 @@ Then clone Juneau into the same hierarchy to "similarity_retrieval_system" as fo
 .
 
 ├── similarity_retrieval_system
+
 │   └── retrieval_system
+
 │       ├── README.md
+
 │       ├── manage.py
+
 │       ├──db.sqlite3
+
 │       ├──interface
+
 │       ├──retrieval_system
+
 │       └──templates
+
 └── juneau
 
 
