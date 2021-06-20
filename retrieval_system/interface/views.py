@@ -19,14 +19,21 @@ from .forms import HelloForm, SelectNodeForm, SelectEdgeForm, SelectTypeForm, Se
 
 
 current_dir=os.getcwd()
-#search_engine_path="/Users/misato/Desktop/my_code" # 以前Jupyterで動かしていた方（卒論用の実験）, コピー時点で内容は同じ
 search_engine_path=f"{current_dir}/interface/retrieval_engine_module"
-upper_dir=current_dir[:current_dir.rfind("similarity_retrieval_system/")]
-juneau_file_path=f"{upper_dir}/juneau_copy" # 以前Jupyterで動かしていた方（卒論用の実験）, コピー時点で内容は同じ
+upper_dir=current_dir[:current_dir.rfind("/similarity_retrieval_system/")]
+flg_loading=False
+if os.path.exists(f"{upper_dir}/juneau_copy"):
+    juneau_file_path=f"{upper_dir}/juneau_copy"
+    flg_loading=True
+    sys.path.append(juneau_file_path)
+elif os.path.exists(f"{upper_dir}/juneau"):
+    juneau_file_path=f"{upper_dir}/juneau" 
+    flg_loading=True
+    sys.path.append(juneau_file_path)
 #juneau_file_path=f"{current_dir}/interface/retrieval_engine_module/juneau_copy"
 sys.path.append(search_engine_path)
 sys.path.append(f"{search_engine_path}/mymodule")
-sys.path.append(juneau_file_path)
+#sys.path.append(juneau_file_path)
 
 from juneau.db.table_db import connect2db_engine, connect2gdb
 from juneau.config import config
@@ -34,11 +41,15 @@ from juneau.config import config
 from workflow_matching import WorkflowMatching
 #from mymodule.workflow_matching import WorkflowMatching
 
+if flg_loading:
+    logging.info(f"Loading Juneau is successful!: {juneau_file_path}")
+else:
+    logging.error("Please arrange your files with the search system and Juneau. The details is written in README.md.")
 
 # Global variable
 G_in_this_nb=None
 jupyter_notebook_localhost_number=8888
-flg_get_db_graph = True # 検索部分を動かすかどうか. 開発用
+flg_get_db_graph = True # For development. 検索部分を動かすかどうか. 開発用
 
 
 # ***** initialization *****
@@ -80,7 +91,7 @@ def get_db_graph(wm):
     wm.set_db_graph()
     set_graph_end_time = timeit.default_timer()    
     set_graph_time=set_graph_end_time-set_graph_start_time
-    logging.info(f"Completed!: Getting workflow graphs from neo4j ({set_graph_time} sec).")
+    logging.info(f"Getting workflow graphs from neo4j is successful! ({set_graph_time} sec).")
     G_in_this_nb=wm.G
     return wm, G_in_this_nb
 
