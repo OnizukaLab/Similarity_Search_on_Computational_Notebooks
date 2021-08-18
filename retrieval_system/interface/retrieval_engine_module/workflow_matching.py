@@ -30,6 +30,8 @@ import networkx as nx
 import re
 import timeout_decorator
 import matplotlib.pyplot as plt
+import copy
+import random
 
 from py2neo import Node, Relationship, NodeMatcher, RelationshipMatcher
 from juneau.config import config
@@ -37,6 +39,7 @@ from juneau.utils.funclister import FuncLister
 from juneau.db.table_db import generate_graph, pre_vars
 from juneau.search.search_prov_code import ProvenanceSearch
 from mymodule.code_relatedness import CodeRelatedness
+from juneau.db.schemamapping import SchemaMapping
 #from lib import CodeComparer
 
 
@@ -56,7 +59,7 @@ class WorkflowMatching:
     
     graph_db (Graph): py2neoのクラス`Graph`のインスタンス
     """
-    def __init__(self, postgres_eng, graph_eng, sim_col_thres=0.5, w_c=1, w_v=1, w_l=1, w_d=1, k=6, change_next_node_thres=0.8, valid_nb_name_file_path="../データセット/valid_nb_name.txt"):#, thres_data_profile=0.9):
+    def __init__(self, postgres_eng, graph_eng, sim_col_thres=0.5, w_c=1, w_v=1, w_l=1, w_d=1, k=6, change_next_node_thres=0.8, valid_nb_name_file_path="../データセット/valid_nb_name.txt", flg_juneau=False):#, thres_data_profile=0.9):
         """
         PostgreSQLのインスタンスとpy2neoのインスタンスをインスタンスにセットする．
 
@@ -113,6 +116,8 @@ class WorkflowMatching:
         self.query_acol_set={}
         self.query_scma_dict={}
         self.calc_v_microbenchmark={"load":0, "set":0, "column_rel":0, "sort":0, "table_rel":0}
+        
+        self.flg_juneau=flg_juneau
 
 
 
@@ -229,6 +234,148 @@ class WorkflowMatching:
         #実際のソースコードを保持
         self.query_cell_code[f"cell_query_{cell_id}"]=source_code
 
+
+
+    #実際のNBの一部 
+    # 実行時間の測定に利用
+    def make_query_for_user_exp(self, workflow_type, cleaned_nb_name, cell_id_list, var_name_list, display_type_list, data_size=1):
+        if workflow_type==1:
+            self.QueryGraph, self.query_root, cell_count, var_count, display_count_dict, max_indegree, max_outdegree=self.make_query_base_graph_1(display_type_list)
+            logging.info(f"using function :make_query_base_graph_1")
+        elif workflow_type==2:
+            self.QueryGraph, self.query_root, cell_count, var_count, display_count_dict, max_indegree, max_outdegree=self.make_query_base_graph_2(display_type_list)
+            logging.info(f"using function :make_query_base_graph_2")
+        elif workflow_type==3:
+            self.QueryGraph, self.query_root, cell_count, var_count, display_count_dict, max_indegree, max_outdegree=self.make_query_base_graph_3(display_type_list)
+            logging.info(f"using function :make_query_base_graph_3")
+        elif workflow_type==4:
+            self.QueryGraph, self.query_root, cell_count, var_count, display_count_dict, max_indegree, max_outdegree=self.make_query_base_graph_cell_only_1()
+            logging.info(f"using function :make_query_base_graph_cell_only_1")
+            
+        if len(cell_id_list)!=cell_count:
+            logging.info(f"err: len of given cell_id_list is invalid. valid len:{cell_count}")
+        if len(var_name_list)!=var_count:
+            logging.info(f"err: len of given cell_id_list is invalid. valid len:{var_count}")
+
+        i=1
+        self.query_table={}
+        for var_name in var_name_list:
+            q_table=self.fetch_var_table(f"{var_name}")
+            self.query_table[f"query_var{i}"]=q_table[:int(len(q_table.index)*data_size)]
+            i+=1
+
+        code_table=self.fetch_source_code_table(f"{cleaned_nb_name}")
+        i=1
+        self.query_cell_code={}
+        for cid in cell_id_list:
+            code=code_table[code_table["cell_id"]==cid]["cell_code"].values
+            code="".join(list(code))
+            self.query_cell_code[f"cell_query_{i}"]=code
+            i+=1
+
+        self.attr_of_q_node_type = nx.get_node_attributes(self.QueryGraph, "node_type")
+        self.attr_of_q_real_cell_id=nx.get_node_attributes(self.QueryGraph, "real_cell_id")
+        self.attr_of_q_display_type=nx.get_node_attributes(self.QueryGraph, "display_type")
+        self.query_lib=self.fetch_all_library_from_db(f"{cleaned_nb_name}")
+        self.query_workflow_info={"Cell": cell_count, "Var": var_count, "Display_data": display_count_dict, "max_indegree": max_indegree, "max_outdegree": max_outdegree}
+        self.set_query_workflow_info_Display_data()
+
+
+    def make_query_base_graph_1(self, display_type_list):
+        base_QueryGraph=nx.DiGraph()
+        for i in range(1,5):
+            base_QueryGraph.add_node(f"cell_query_{i}", node_type="Cell", real_cell_id=f"{i}")
+        base_QueryGraph.add_node("query_var1", node_type="Var", data_type="pandas.core.frame.DataFrame")
+        #参考: self.G.add_node(node["name"], node_type="Display_data", nb_name=node["nb_name"], display_type=node["data_type"], cell_id=node["real_cell_id"])
+        base_QueryGraph.add_node("query_display1", node_type="Display_data", display_type=display_type_list[0], cell_id="2")
+        base_QueryGraph.add_node("query_display2", node_type="Display_data", display_type=display_type_list[1], cell_id="4")
+
+        base_QueryGraph.add_edge("cell_query_1", "cell_query_2")
+        base_QueryGraph.add_edge("cell_query_2", "cell_query_3")
+        base_QueryGraph.add_edge("cell_query_2", "query_var1")
+        base_QueryGraph.add_edge("cell_query_2", "query_display1")
+        base_QueryGraph.add_edge("cell_query_3", "cell_query_4")
+        base_QueryGraph.add_edge("cell_query_4", "query_display2")
+        cell_count=4
+        var_count=1
+        display_count_dict={}
+        for d_type in display_type_list:
+            if d_type not in display_count_dict:
+                display_count_dict[d_type]=0
+            display_count_dict[d_type]+=1
+        max_indegree=1
+        max_outdegree=3
+        query_root="cell_query_1"
+        return base_QueryGraph, query_root, cell_count, var_count, display_count_dict, max_indegree, max_outdegree
+
+    def make_query_base_graph_2(self, display_type_list):
+        base_QueryGraph=nx.DiGraph()
+        for i in range(1,5):
+            base_QueryGraph.add_node(f"cell_query_{i}", node_type="Cell", real_cell_id=f"{i}")
+        base_QueryGraph.add_node("query_var1", node_type="Var", data_type="pandas.core.frame.DataFrame")
+        base_QueryGraph.add_node("query_var2", node_type="Var", data_type="pandas.core.frame.DataFrame")
+        #参考: self.G.add_node(node["name"], node_type="Display_data", nb_name=node["nb_name"], display_type=node["data_type"], cell_id=node["real_cell_id"])
+        base_QueryGraph.add_node("query_display1", node_type="Display_data", display_type=display_type_list[0], cell_id="2")
+
+        base_QueryGraph.add_edge("cell_query_1", "cell_query_2")
+        base_QueryGraph.add_edge("cell_query_2", "cell_query_3")
+        base_QueryGraph.add_edge("cell_query_2", "query_var1")
+        base_QueryGraph.add_edge("cell_query_2", "query_display1")
+        base_QueryGraph.add_edge("cell_query_3", "cell_query_4")
+        base_QueryGraph.add_edge("cell_query_4", "query_var2")
+        cell_count=4
+        var_count=1
+        display_count_dict={}
+        for d_type in display_type_list:
+            if d_type not in display_count_dict:
+                display_count_dict[d_type]=0
+            display_count_dict[d_type]+=1
+        max_indegree=1
+        max_outdegree=3
+        query_root="cell_query_1"
+        return base_QueryGraph, query_root, cell_count, var_count, display_count_dict, max_indegree, max_outdegree
+
+    def make_query_base_graph_3(self, display_type_list):
+        base_QueryGraph=nx.DiGraph()
+        for i in range(1,5):
+            base_QueryGraph.add_node(f"cell_query_{i}", node_type="Cell", real_cell_id=f"{i}")
+        base_QueryGraph.add_node("query_var1", node_type="Var", data_type="pandas.core.frame.DataFrame")
+        base_QueryGraph.add_node("query_var2", node_type="Var", data_type="pandas.core.frame.DataFrame")
+        #参考: self.G.add_node(node["name"], node_type="Display_data", nb_name=node["nb_name"], display_type=node["data_type"], cell_id=node["real_cell_id"])
+        base_QueryGraph.add_node("query_display1", node_type="Display_data", display_type=display_type_list[0], cell_id="2")
+
+        base_QueryGraph.add_edge("cell_query_1", "cell_query_2")
+        base_QueryGraph.add_edge("cell_query_1", "query_var1")
+        base_QueryGraph.add_edge("cell_query_1", "query_display1")
+        base_QueryGraph.add_edge("cell_query_2", "cell_query_3")
+        base_QueryGraph.add_edge("cell_query_3", "cell_query_4")
+        base_QueryGraph.add_edge("cell_query_4", "query_var2")
+        cell_count=4
+        var_count=1
+        display_count_dict={}
+        for d_type in display_type_list:
+            if d_type not in display_count_dict:
+                display_count_dict[d_type]=0
+            display_count_dict[d_type]+=1
+        max_indegree=1
+        max_outdegree=3
+        query_root="cell_query_1"
+        return base_QueryGraph, query_root, cell_count, var_count, display_count_dict, max_indegree, max_outdegree
+
+    def make_query_base_graph_cell_only_1(self):
+        base_QueryGraph=nx.DiGraph()
+        for i in range(1,5):
+            base_QueryGraph.add_node(f"cell_query_{i}", node_type="Cell", real_cell_id=f"{i}")
+        base_QueryGraph.add_edge("cell_query_1", "cell_query_2")
+        base_QueryGraph.add_edge("cell_query_2", "cell_query_3")
+        base_QueryGraph.add_edge("cell_query_3", "cell_query_4")
+        cell_count=4
+        var_count=0
+        display_count_dict={}
+        max_indegree=1
+        max_outdegree=1
+        query_root="cell_query_1"
+        return base_QueryGraph, query_root, cell_count, var_count, display_count_dict, max_indegree, max_outdegree
 
 
 
@@ -3788,7 +3935,7 @@ class WorkflowMatching:
         ret_score=1-(graph_edit_dist/self.normalization)
         return ret_score
 
-
+    #不使用
     def bench_mark_calc_table_rel(self, limit=100):
         time2=0
         calc_count=0
@@ -3841,6 +3988,8 @@ class WorkflowMatching:
         Returns:
             float-like: tableAとtableBの類似度．
         """
+        if self.flg_juneau:
+            return  0.0
         #group idはnb_nameで代用できる(つながっているワークフローごとに一意なので)
         logging.info("calc table sim...")
 
@@ -3925,6 +4074,8 @@ class WorkflowMatching:
         Returns:
             float-like: tableAとtableBの類似度．
         """
+        if self.flg_juneau:
+            return 0.0
         #group idはnb_nameで代用できる(つながっているワークフローごとに一意なので)
         logging.info("calc table sim...")
         rel_score=0.0
@@ -4237,14 +4388,21 @@ class WorkflowMatching:
         Returns:
             float: ジャカード類似度．
         """
-        if min(len(colA), len(colB)) == 0:
+        try:
+            if min(len(colA), len(colB)) == 0:
+                return 0
+            colA = np.array(colA) #numpyの型に変換?
+            # 疑問: colBは変換しなくて良いのか？
+            colB = np.array(colB) #numpyの型に変換?
+            union = len(np.union1d(colA, colB))
+            inter = len(np.intersect1d(colA, colB))
+            return float(inter) / float(union)
+        except:
             return 0
-        colA = np.array(colA) #numpyの型に変換?
-        # 疑問: colBは変換しなくて良いのか？
-        colB = np.array(colB) #numpyの型に変換?
-        union = len(np.union1d(colA, colB))
-        inter = len(np.intersect1d(colA, colB))
-        return float(inter) / float(union)
+
+    @staticmethod
+    def jaccard_similarity(self, colA, colB):
+        return self.jaccard_similarity_coefficient(colA, colB)
 
     @staticmethod
     def row_similarity(colA, colB):
@@ -4645,3 +4803,1259 @@ class WorkflowMatching:
         if kilo:
             return df_size_sum/1024
         return df_size_sum
+
+
+
+    # Juneauの適用
+
+    def sketch_query_cols(self, query, sz=5) -> list:
+        # 疑問: データがfloat型のみの場合はサンプリングがうまくいかない(szより列数が小さくなる可能性がある)と思われるが, どうなのか.(sketch_column_and_row_for_meta_mappingも)
+        """
+        引数のテーブルqueryに対し，引数szで指定する最大列数以下のテーブルの列名をlistで返す．
+        最大列数まで列数を減らすときは、その列の値ができるだけバラバラな値をとる順(|セット集合|/|多重集合|が大きい順)に残す．
+
+        Args:
+            query (DataFrame): クエリ(テーブル).
+            sz (int): 列数の最大サイズ．defaults to 5.
+
+        Returns:
+            list [str]: 指定の最大列数だけサンプリングしたテーブルの列名.元の列数が指定の最大列数より少ない場合は，全ての列名のリスト．
+        """
+        if query.shape[1] <= sz: # queryの列数がsz以下の時. (query.shape[1]: queryの列数)
+            return query.columns.tolist() # .tolist(): リスト型listに変換
+        else: # queryの列数がszより多い場合はサンプリングする.
+            q_cols = query.columns.tolist() # q_cols (list[str]): queryの列名リスト.
+            c_scores = []
+            for i in q_cols: # 各列に対して以下の操作
+                if i == "Unnamed: 0" or "index" in i:
+                    continue
+                if query[i].dtype is np.dtype(float): # テーブルqueryの列名iのデータ型がfloatのときcontinue
+                    continue
+                cs_v = query[i].tolist()
+                # |セット集合|/|多重集合|を計算
+                c_scores.append((i, float(len(set(cs_v))) / float(len(cs_v))))
+            # その列の値ができるだけバラバラな値をとる順にソートする．
+            c_scores = sorted(c_scores, key=lambda d: d[1], reverse=True) #降順ソート
+
+            q_cols_chosen = []
+            c_count = 0
+            for i, j in c_scores: # i (str): 列名
+                if c_count == sz:
+                    break
+                q_cols_chosen.append(i)
+                c_count += 1
+            return q_cols_chosen
+
+
+    def sketch_column_and_row_for_meta_mapping(self, sz=5, row_size=1000):
+        # 疑問: データがfloat型のみの場合はサンプリングがうまくいかない(szより列数が小さくなる可能性がある)と思われるが, どうなのか.(sketch_query_colsも)
+        """
+        変更点：schema_elementを引数とし，schema_element_sample_colを返す関数に変更．
+        
+        
+        テーブルself.schema_elementについて，各テーブルグループに対して列数および行数が指定の最大数以下となるように，
+        テーブルグループごとにデータをサンプリングする．
+        サンプリングの結果はself.schema_element_sample_colに格納．
+
+        Args:
+            sz (int): サンプリングする最大の列(col)数．defaults to 5.
+            row_size (int): サンプリングする最大の行(row)数．defaults to 1000. 
+
+        self.var str:
+            self.schema_element (dict{int: dict{str: list[]}):
+                テーブルグループごとの，各列名の列の実際のデータ値の重複無し集合．(null値を除く.)
+                {テーブルグループID: {列名: [同じ列名を持つグループ内のすべてのテーブルから集めた実際のデータ値]}}
+            self.schema_element_sample_col (dict{int: dict{str: list[]}):
+                self.schema_elementの各テーブルグループに対して指定のサイズ以下の列数，行数となるようにサンプリングしたもの．
+        """
+        self.schema_element_sample_col = {}
+        for i in self.schema_element.keys(): # 各テーブルグループに対し以下の処理
+            self.schema_element_sample_col[i] = {}
+            if len(self.schema_element[i].keys()) <= sz: # テーブルグループの列数がsz個以下の時
+                # 表データの行のサンプリング
+                # scはschemaの略か.
+                for sc in self.schema_element[i].keys(): # 指定テーブルグループの各列に対して
+                    if len(self.schema_element[i][sc]) < row_size: # 最大行数よりもサンプリング対象の行数が少ない場合は, すべての行を得る.
+                        self.schema_element_sample_col[i][sc] = self.schema_element[i][sc]
+                    else: # 最大行数よりもサンプリング対象の行数が多い場合は, 最大行数分だけをランダムに選んで抽出する.
+                        self.schema_element_sample_col[i][sc] = random.sample(
+                            self.schema_element[i][sc], row_size
+                        )
+            else: # サンプリング対象の列数がsz列より多いとき
+                ##
+                # sc_choice ([str, float]): strは列名, floatはその列のデータ(値)の集合に対して, 
+                # |セット集合|/|多重集合|を計算している.(セット集合 = 重複無し集合). 
+                # scはschemaの略か.
+                ##
+                sc_choice = []
+                for sc in self.schema_element[i].keys():
+                    if sc == "Unnamed: 0" or "index" in sc:
+                        continue
+                    if self.schema_element_dtype[i][sc] is np.dtype(float):
+                        continue
+                    sc_value = list(self.schema_element[i][sc]) # テーブルグループIDがi, 列名がscの実データ値をsc_valueに格納
+                    # sc列目のデータ集合に対し, |セット集合|/|多重集合|を計算
+                    sc_choice.append(
+                        (sc, float(len(set(sc_value))) / float(len(sc_value)))
+                    )
+                # その列の値ができるだけバラバラな値をとる順にソートする．
+                sc_choice = sorted(sc_choice, key=lambda d: d[1], reverse=True) #降順
+
+                count = 0
+                for sc, v in sc_choice:
+                    if count == sz:
+                        break
+                    # 表データの行のサンプリング
+                    if len(self.schema_element[i][sc]) < row_size: # 最大行数よりもサンプリング対象の表データの行数が少ない場合は, すべての行を得る.
+                        self.schema_element_sample_col[i][sc] = self.schema_element[i][
+                            sc
+                        ]
+                    else: # 最大行数よりもサンプリング対象の表データの行数が多い場合は, 最大行数分だけをランダムに選んで抽出する.
+                        self.schema_element_sample_col[i][sc] = random.sample(
+                            self.schema_element[i][sc], row_size
+                        )
+
+                    count += 1
+
+
+    def init_schema_mapping(self, max_table_groups=1001001):
+        # search_withprov.pyから
+
+        logging.info("Start Reading From Neo4j!")
+        #matcher = NodeMatcher(self.geng)
+        #matcher = NodeMatcher(graph_db)
+
+        #tables_touched = [] # list[str]: tables_connectedにすでに入れたテーブル名のリスト.
+        tables_connected = [] # list[list[str]]: グループ(ワークフローグラフで接続された関係にあるもののグループ)ごとのテーブル名リストのリスト．
+        # self.real_tables ({str: DataFrame}): (テーブル名:実際のテーブルの内容)の辞書. 
+        # テーブル名はf"rtable{idi}"またはf"rtable{idi}_{vid}"となっている． 
+        # idiはintまたはstr(変数名)か. vidはversion IDのことか.
+        #for i in self.real_tables.keys(): # i (str): テーブル名
+        #    # テーブルとその従属関係があるテープルをすべて探す.
+        #    if i[6:] not in set(tables_touched): # i[6:]: テーブル名から"rtables"を除いた部分.変数名か.
+        #        logging.info(i)
+        #        current_node = matcher.match("Var", name=i[6:]).first() # current_node (Node): 変数のノード
+        #        connected_tables = self.dfs(current_node) # connected_tables (str): 変数 idi に従属関係のあるテーブルの変数名リスト.
+        #        tables_touched = tables_touched + connected_tables # リストの連結
+        #        tables_connected.append(connected_tables)
+        self.real_tables={}
+        for nb_nameA in self.valid_nb_name:
+            connected_tables = []
+            for node, nb_nameB in self.attr_of_db_nb_name.items():
+                if nb_nameA != nb_nameB:
+                    continue
+                if self.attr_of_db_node_type[node] != "Var":
+                    continue
+                
+                real_table=self.fetch_var_table(node)
+                if "Unnamed: 0" in real_table.columns: #列名に不備がある場合はその列を削除
+                    real_table.drop(["Unnamed: 0"], axis=1, inplace=True)
+                if "Unnamed:0" in real_table.columns: #列名に不備がある場合はその列を削除
+                    real_table.drop(["Unnamed:0"], axis=1, inplace=True)
+                self.real_tables[node]=real_table
+
+                connected_tables.append(node)
+            tables_connected.append(connected_tables)
+
+            if len(tables_connected) > max_table_groups: #テスト動作用
+                break
+                
+            
+        self.schema_linking = {}
+        #schema_linking = {}
+        self.schema_element = {}
+        #schema_element = {}
+        self.schema_element_count = {}
+        #schema_element_count = {}
+        self.schema_element_dtype = {}
+        #schema_element_dtype = {}
+
+        self.table_group = {}
+        #table_group = {}
+
+        # assign each table a group id
+        for idi, i in enumerate(tables_connected):
+            for j in i:
+                self.table_group[j] = idi # self.table_group[テーブル名(変数名または変数名_vid?)]=グループID
+                #table_group[j] = idi # self.table_group[テーブル名(変数名または変数名_vid?)]=グループID
+
+        for idi, i in enumerate(tables_connected):
+            # idi (int): enumerateによる, ループごとにインクリメントする整数.
+            # i (str): 変数名または変数名_vid. "rtable"+iでテーブル名になる.
+            self.schema_linking[idi] = {}
+            #schema_linking[idi] = {}
+            self.schema_element[idi] = {}
+            #schema_element[idi] = {}
+            self.schema_element_dtype[idi] = {}
+            #schema_element_dtype[idi] = {}
+            self.schema_element_count[idi] = {}
+            #schema_element_count[idi] = {}
+
+            for j in i: # 各テーブルに対し
+                #tname = "rtable" + j
+                tname = j
+                #if tname not in self.real_tables: # テーブル名エラーの時
+                #    continue
+                
+                #for col in self.real_tables[tname].columns: # テーブルの列それぞれに対して以下の操作
+                real_table = self.real_tables[tname] # 代替方法として追加. 以下，"real_tables[tname]"をreal_tableに変更済み．
+                #real_tables[tname]=real_table
+                    
+                for col in real_table.columns: # テーブルの列それぞれに対して以下の操作
+                    # テーブルの列名ごとに固有のsidを付与.
+                    if col not in self.schema_linking[idi]:
+                        if len(self.schema_linking[idi].keys()) == 0: # まだself.schema_linking[idi]に要素が入っていないとき(ループ1周目)
+                            sid = 0
+                        else:
+                            sid = max(list(self.schema_linking[idi].values())) + 1
+
+                        self.schema_linking[idi][col] = sid
+                        self.schema_element_dtype[idi][col] = real_table[
+                            col
+                        ].dtype
+                        self.schema_element_count[idi][col] = 1
+                        self.schema_element[idi][col] = []
+                        #schema_element[idi][col] += real_tables[tname][col][
+                        self.schema_element[idi][col] += real_table[col][
+                            real_table[col].notnull() # Null値でないときにTrue
+                        ].tolist()
+                        self.schema_element[idi][col] = list(
+                            set(self.schema_element[idi][col])
+                        )
+                    else:
+                        self.schema_element[idi][col] += real_table[col][
+                            real_table[col].notnull()
+                        ].tolist()
+                        self.schema_element[idi][col] = list(
+                            set(self.schema_element[idi][col])
+                        )
+                        self.schema_element_count[idi][col] += 1
+        logging.info("There are %s groups of tables." % len(tables_connected))
+        #return tables_connected, schema_linking, schema_element, schema_element_count, schema_element_dtype, table_group
+
+    def save_schema_mapping_json(self):
+        """
+        開発用
+        """
+        current_dir_path = os.getcwd()
+
+        save_tmp={}
+        for i in self.schema_element.keys():
+            try:
+                save_tmp[i]=json.dumps(self.schema_element[i])
+            except:
+                pass
+        with open(f"{current_dir_path}/sample_profiled_dataset/schema_element.json", 'w', encoding='utf-8') as f:
+            json.dump(save_tmp, f, indent=2, ensure_ascii=False)
+        with open(f"{current_dir_path}/sample_profiled_dataset/schema_linking.json", 'w', encoding='utf-8') as f:
+            json.dump(self.schema_linking, f, indent=2, ensure_ascii=False)
+        with open(f"{current_dir_path}/sample_profiled_dataset/schema_element_count.json", 'w', encoding='utf-8') as f:
+            json.dump(self.schema_element_count, f, indent=2, ensure_ascii=False)
+        #with open(f"{current_dir_path}/sample_profiled_dataset/schema_element_dtype.json", 'w', encoding='utf-8') as f:
+        #    json.dump(self.schema_element_dtype, f, indent=2, ensure_ascii=False)
+        with open(f"{current_dir_path}/sample_profiled_dataset/table_group.json", 'w', encoding='utf-8') as f:
+            json.dump(self.table_group, f, indent=2, ensure_ascii=False)
+        
+    def init_schema_mapping_json(self):
+        """
+        開発用
+        """
+        current_dir_path = os.getcwd()
+        with open(f"{current_dir_path}/sample_profiled_dataset/schema_element.json", encoding='utf-8') as f:
+            self.schema_element = json.load(f)    
+        with open(f"{current_dir_path}/sample_profiled_dataset/schema_linking.json", encoding='utf-8') as f:
+            self.schema_linking = json.load(f)
+        with open(f"{current_dir_path}/sample_profiled_dataset/schema_element_count.json", encoding='utf-8') as f:
+            self.schema_element_count = json.load(f)
+        #with open(f"{current_dir_path}/sample_profiled_dataset/schema_element_dtype.json", encoding='utf-8') as f:
+        #    self.schema_element_dtype = json.load(f)
+        with open(f"{current_dir_path}/sample_profiled_dataset/table_group.json", encoding='utf-8') as f:
+            self.table_group = json.load(f)
+
+
+    def init_schema_mapping2(self, max_table_groups=1001001):
+        """
+        開発用
+        """
+        # search_withprov.pyから
+
+        logging.info("Start Reading From Neo4j!")
+        tables_connected = []
+        self.real_tables={}
+        for nb_nameA in self.valid_nb_name:
+            connected_tables = []
+            for node, nb_nameB in self.attr_of_db_nb_name.items():
+                if nb_nameA != nb_nameB:
+                    continue
+                if self.attr_of_db_node_type[node] != "Var":
+                    continue
+
+                real_table=self.fetch_var_table(node)
+                if "Unnamed: 0" in real_table.columns: #列名に不備がある場合はその列を削除
+                    real_table.drop(["Unnamed: 0"], axis=1, inplace=True)
+                if "Unnamed:0" in real_table.columns: #列名に不備がある場合はその列を削除
+                    real_table.drop(["Unnamed:0"], axis=1, inplace=True)
+                self.real_tables[node]=real_table
+
+                connected_tables.append(node)
+            tables_connected.append(connected_tables)
+
+
+            if len(tables_connected) > max_table_groups: #テスト動作用
+                break
+                
+            
+        self.schema_linking = {}
+        self.schema_element = {}
+        self.schema_element_count = {}
+        self.schema_element_dtype = {}
+        self.table_group = {}
+        self.init_schema_mapping_json()
+
+
+        for idi, i in enumerate(tables_connected):
+            flg_schema_element=False
+            if idi not in self.schema_element:
+                self.schema_element[idi] = {}
+                flg_schema_element=True
+            self.schema_element_dtype[idi] = {}
+            for j in i: # 各テーブルに対し
+                #tname = "rtable" + j
+                tname = j
+                #if tname not in self.real_tables: # テーブル名エラーの時
+                #    continue
+                
+                #for col in self.real_tables[tname].columns: # テーブルの列それぞれに対して以下の操作
+                real_table = self.real_tables[tname] # 代替方法として追加. 以下，"real_tables[tname]"をreal_tableに変更済み．
+                #real_tables[tname]=real_table
+                    
+                if flg_schema_element:
+                    for col in real_table.columns: # テーブルの列それぞれに対して以下の操作
+                        # テーブルの列名ごとに固有のsidを付与.
+                        if col not in self.schema_linking[idi]:
+                            self.schema_element_dtype[idi][col] = real_table[
+                                col
+                            ].dtype
+                            self.schema_element[idi][col] = []
+                            #schema_element[idi][col] += real_tables[tname][col][
+                            self.schema_element[idi][col] += real_table[col][
+                                real_table[col].notnull() # Null値でないときにTrue
+                            ].tolist()
+                            self.schema_element[idi][col] = list(
+                                set(self.schema_element[idi][col])
+                            )
+                        else:
+                            self.schema_element[idi][col] += real_table[col][
+                                real_table[col].notnull()
+                            ].tolist()
+                            self.schema_element[idi][col] = list(
+                                set(self.schema_element[idi][col])
+                            )
+                else:
+                    for col in real_table.columns: # テーブルの列それぞれに対して以下の操作
+                        # テーブルの列名ごとに固有のsidを付与.
+                        if col not in self.schema_linking[idi]:
+                            self.schema_element_dtype[idi][col] = real_table[
+                                col
+                            ].dtype
+                        else:
+                            pass
+
+        logging.info("There are %s groups of tables." % len(tables_connected))
+        #return tables_connected, schema_linking, schema_element, schema_element_count, schema_element_dtype, table_group
+
+    def init_schema_mapping3(self, max_table_groups=1001001):
+        """
+        開発用
+        """
+        # search_withprov.pyから
+
+        logging.info("Start Reading From Neo4j!")
+        tables_connected = []
+        self.real_tables={}
+        for nb_nameA in self.valid_nb_name:
+            connected_tables = []
+            for node, nb_nameB in self.attr_of_db_nb_name.items():
+                if nb_nameA != nb_nameB:
+                    continue
+                if self.attr_of_db_node_type[node] != "Var":
+                    continue
+
+                real_table=self.fetch_var_table(node)
+                if "Unnamed: 0" in real_table.columns: #列名に不備がある場合はその列を削除
+                    real_table.drop(["Unnamed: 0"], axis=1, inplace=True)
+                if "Unnamed:0" in real_table.columns: #列名に不備がある場合はその列を削除
+                    real_table.drop(["Unnamed:0"], axis=1, inplace=True)
+                self.real_tables[node]=real_table
+
+                connected_tables.append(node)
+            tables_connected.append(connected_tables)
+
+
+            if len(tables_connected) > max_table_groups: #テスト動作用
+                break
+                
+
+        logging.info("There are %s groups of tables." % len(tables_connected))
+        #return tables_connected, schema_linking, schema_element, schema_element_count, schema_element_dtype, table_group
+
+
+
+    """
+    def init_schema_mapping2(self, max_table_groups=1001001, thres=0.7):
+        # search_withprov.pyから
+
+        logging.info("Start Reading From Neo4j!")
+        #matcher = NodeMatcher(self.geng)
+        #matcher = NodeMatcher(graph_db)
+
+        #tables_touched = [] # list[str]: tables_connectedにすでに入れたテーブル名のリスト.
+        tables_connected = [] # list[list[str]]: グループ(ワークフローグラフで接続された関係にあるもののグループ)ごとのテーブル名リストのリスト．
+        # self.real_tables ({str: DataFrame}): (テーブル名:実際のテーブルの内容)の辞書. 
+        # テーブル名はf"rtable{idi}"またはf"rtable{idi}_{vid}"となっている． 
+        # idiはintまたはstr(変数名)か. vidはversion IDのことか.
+        #for i in self.real_tables.keys(): # i (str): テーブル名
+        #    # テーブルとその従属関係があるテープルをすべて探す.
+        #    if i[6:] not in set(tables_touched): # i[6:]: テーブル名から"rtables"を除いた部分.変数名か.
+        #        logging.info(i)
+        #        current_node = matcher.match("Var", name=i[6:]).first() # current_node (Node): 変数のノード
+        #        connected_tables = self.dfs(current_node) # connected_tables (str): 変数 idi に従属関係のあるテーブルの変数名リスト.
+        #        tables_touched = tables_touched + connected_tables # リストの連結
+        #        tables_connected.append(connected_tables)
+        self.real_tables={}
+        for nb_nameA in self.valid_nb_name:
+            for node, nb_nameB in self.attr_of_db_nb_name.items():
+                if nb_nameA != nb_nameB:
+                    continue
+                if self.attr_of_db_node_type[node] != "Var":
+                    continue
+                self.real_tables[node]=self.fetch_var_table(node)
+            if len(self.real_tables) > max_table_groups: #テスト動作用
+                break
+                
+            
+        self.schema_linking = {}
+        #schema_linking = {}
+        self.schema_element = {}
+        #schema_element = {}
+        self.schema_element_count = {}
+        #schema_element_count = {}
+        self.schema_element_dtype = {}
+        #schema_element_dtype = {}
+
+        self.table_group = {}
+        #table_group = {}
+
+        # assign each table a group id
+        #for idi, i in enumerate(tables_connected):
+        #    for j in i:
+        #        self.table_group[j] = idi # self.table_group[テーブル名(変数名または変数名_vid?)]=グループID
+                #table_group[j] = idi # self.table_group[テーブル名(変数名または変数名_vid?)]=グループID
+
+        idi=-1
+        score=0
+        for tname in self.real_tables:
+            if score < thres:
+                idi += 1
+                # idi (int): enumerateによる, ループごとにインクリメントする整数.
+                # i (str): 変数名または変数名_vid. "rtable"+iでテーブル名になる.
+                self.schema_linking[idi] = {}
+                #schema_linking[idi] = {}
+                self.schema_element[idi] = {}
+                #schema_element[idi] = {}
+                self.schema_element_dtype[idi] = {}
+                #schema_element_dtype[idi] = {}
+                self.schema_element_count[idi] = {}
+                #schema_element_count[idi] = {}
+
+            for j in i: # 各テーブルに対し
+                #tname = "rtable" + j
+                tname = j
+                #if tname not in self.real_tables: # テーブル名エラーの時
+                #    continue
+                
+                #for col in self.real_tables[tname].columns: # テーブルの列それぞれに対して以下の操作
+                real_table = self.real_tables[tname]
+                if "Unnamed: 0" in real_table.columns: #列名に不備がある場合はその列を削除
+                    real_table.drop(["Unnamed: 0"], axis=1, inplace=True)
+                if "Unnamed:0" in real_table.columns: #列名に不備がある場合はその列を削除
+                    real_table.drop(["Unnamed:0"], axis=1, inplace=True)
+                #real_tables[tname]=real_table
+                    
+                for col in real_table.columns: # テーブルの列それぞれに対して以下の操作
+                    # テーブルの列名ごとに固有のsidを付与.
+                    if col not in self.schema_linking[idi]:
+                        if len(self.schema_linking[idi].keys()) == 0: # まだself.schema_linking[idi]に要素が入っていないとき(ループ1周目)
+                            sid = 0
+                        else:
+                            sid = max(list(self.schema_linking[idi].values())) + 1
+
+                        self.schema_linking[idi][col] = sid
+                        self.schema_element_dtype[idi][col] = real_table[
+                            col
+                        ].dtype
+                        self.schema_element_count[idi][col] = 1
+                        self.schema_element[idi][col] = []
+                        #schema_element[idi][col] += real_tables[tname][col][
+                        self.schema_element[idi][col] += real_table[col][
+                            real_table[col].notnull() # Null値でないときにTrue
+                        ].tolist()
+                        self.schema_element[idi][col] = list(
+                            set(self.schema_element[idi][col])
+                        )
+                    else:
+                        self.schema_element[idi][col] += real_table[col][
+                            real_table[col].notnull()
+                        ].tolist()
+                        self.schema_element[idi][col] = list(
+                            set(self.schema_element[idi][col])
+                        )
+                        self.schema_element_count[idi][col] += 1
+        logging.info("There are %s groups of tables." % len(tables_connected))
+        #return tables_connected, schema_linking, schema_element, schema_element_count, schema_element_dtype, table_group
+
+    """
+
+    def sample_rows_for_each_column(self, row_size=1000):
+        """
+        テーブルself.schema_elementについて，各テーブルグループに対して行数が指定の最大行数以下となるように，
+        テーブルグループごとにデータをサンプリングする．
+        サンプリングの結果はself.schema_element_sample_rowに格納．
+
+        Args:
+            row_size (int): サンプリングする最大の行数．defaults to 1000. 
+
+        self.var str:
+            self.schema_element ({int: {str: list[]}):
+                テーブルグループごとの，各列名の列の実際のデータ値の重複無し集合．(null値を除く.)
+                {テーブルグループID: {列名: [同じ列名を持つグループ内のすべてのテーブルから集めた実際のデータ値]}}
+            self.schema_element_sample_row ({int/str: {str: list[]}}):
+                self.schema_elementの各テーブルグループに対して指定のサイズ以下の行数となるようにサンプリングしたもの．
+        """
+        self.schema_element_sample_row = {}
+        for i in self.schema_element.keys(): # 各テーブルに対して（i:テーブル名）
+            self.schema_element_sample_row[i] = {}
+            for sc in self.schema_element[i].keys(): #各列に対して(sc:列名)
+                if len(self.schema_element[i][sc]) < row_size: # サンプリング前のデータ数（行数）がrow_sizeより小さければそのままを保持
+                    self.schema_element_sample_row[i][sc] = self.schema_element[i][sc]
+                else: #サンプリング前のデータ数（行数）がrow_sizeより大きれば, 行をサンプリングして行数をrow_sizeにする．
+                    self.schema_element_sample_row[i][sc] = random.sample(
+                        self.schema_element[i][sc], row_size
+                    )
+
+
+    def schema_mapping(self, tableA, tableB, meta_mapping, gid):
+        """
+        withprov_optから
+        """
+        s_mapping = {} # dict{}: 内容は{sid: 列名}
+        t_mapping = {} # dict{}: 内容は{sid: 列名}
+        for i in tableA.columns.tolist(): # tableAの列名のリスト. (.tolist(): PandasのDataFrame型をリスト型listに変換)
+            # i (str): 列名
+            if i not in meta_mapping[gid]:
+                continue
+            # meta_mappingのグループIDがgidに同名の列名が存在する場合
+            t_mapping[self.schema_linking[gid][meta_mapping[gid][i]]] = i
+
+        for i in tableB.columns.tolist(): # tableBの列名それぞれに対し
+            # i (str): 列名
+            if self.schema_linking[gid][i] in t_mapping: # tableAとtableBで共通のsidが存在する場合
+                if ( # tableAとtableBで列名iの列のデータ型が異なる場合
+                    tableB[i].dtype
+                    != tableA[t_mapping[self.schema_linking[gid][i]]].dtype
+                ):
+                    continue
+                # tableAとtableBで列名iの列のデータ型が同じ場合
+                s_mapping[t_mapping[self.schema_linking[gid][i]]] = i
+
+        max_valueL = []
+        for i in s_mapping.keys():
+            j = s_mapping[i] # j (str): 列名
+            max_valueL.append(self.row_similarity(tableA[i], tableB[j]))
+
+        if len(max_valueL) > 0:
+            mv = max(max_valueL)
+        else:
+            mv = 0
+
+        return s_mapping, mv
+
+    def comp_table_similarity_key(
+        self, 
+        SM_test,
+        tableA,
+        tableB,
+        SM,
+        gid,
+        meta_mapping,
+        schema_linking,
+        thres_key_prune,
+        thres_key_cache,
+        unmatched,
+    ):
+        """
+        withprov_optから
+        """
+
+        key_choice = []
+        for kyA in SM.keys():
+            flg = False
+            if kyA in self.already_map[gid]:
+                determined = self.already_map[gid][kyA]
+                check_set = set(list(SM.values()))
+                for ds in determined:
+                    if ds.issubset(check_set):
+                        flg = True
+                        break
+                if flg:
+                    key_choice.append(
+                        (
+                            kyA,
+                            self.app_common_key(
+                                tableA, tableB, SM, kyA, thres_key_prune
+                            ),
+                        )
+                    )
+                    break
+
+                else:
+                    key_score = self.app_common_key(
+                        tableA, tableB, SM, kyA, thres_key_prune
+                    )
+                    key_choice.append((kyA, key_score))
+                    if key_score == 1:
+                        break
+            else:
+                key_score = self.app_common_key(
+                    tableA, tableB, SM, kyA, thres_key_prune
+                )
+                key_choice.append((kyA, key_score))
+
+        if len(key_choice) == 0:
+            return 0, meta_mapping, unmatched, 0, None
+        else:
+            key_choice = sorted(key_choice, key=lambda d: d[1], reverse=True)
+            key_chosen = key_choice[0][0]
+            key_factor = key_choice[0][1]
+
+            if key_factor >= thres_key_cache:
+                if key_chosen not in self.already_map[gid]:
+                    self.already_map[gid][key_chosen] = []
+                self.already_map[gid][key_chosen].append(set(list(SM.values())))
+
+            (
+                SM_real,
+                meta_mapping,
+                unmatched,
+                sm_time,
+            ) = SM_test.mapping_naive_incremental(
+                tableA, tableB, gid, meta_mapping, schema_linking, unmatched, mapped=SM
+            )
+
+            row_sim = self.row_similarity(
+                tableA[key_chosen], tableB[SM_real[key_chosen]]
+            )
+            col_sim = self.col_similarity(tableA, tableB, SM_real, key_factor)
+
+            return col_sim, row_sim, meta_mapping, unmatched, sm_time, key_chosen
+
+
+    def app_common_key(self, tableA, tableB, SM, key, thres_prune) -> float:
+        kyA = key
+        kyB = SM[key]
+        key_value_A = tableA[kyA].tolist()
+        key_value_B = tableB[kyB].tolist()
+
+        key_estimateA = float(len(set(key_value_A))) / float(len(key_value_A))
+        key_estimateB = float(len(set(key_value_B))) / float(len(key_value_B))
+        if min(key_estimateA, key_estimateB) <= thres_prune:
+            return 0
+
+        mapped_keyA = list(SM.keys())
+
+        if kyA not in self.query_fd:
+            self.query_fd[kyA] = {}
+            for idv, kv in enumerate(key_value_A):
+                if kv not in self.query_fd[kyA]:
+                    self.query_fd[kyA][kv] = []
+                self.query_fd[kyA][kv].append(
+                    ",".join(map(str, tableA[mapped_keyA].iloc[idv].tolist()))
+                )
+            fd = copy.deepcopy(self.query_fd[key])
+        else:
+            fd = copy.deepcopy(self.query_fd[key])
+
+        mapped_keyB = list(SM.values())
+        for idv, kv in enumerate(key_value_B):
+            if kv not in fd:
+                fd[kv] = []
+            fd[kv].append(",".join(map(str, tableB[mapped_keyB].iloc[idv].tolist())))
+
+        key_score = 0
+        for fdk in fd.keys():
+            key_score = key_score + float(len(set(fd[fdk]))) / float(
+                tableA.shape[0] + tableB.shape[0]
+            )
+
+        return key_score
+
+    def remove_dup(self, ranked_list, ks):
+        """
+        3要素リストの重複を取り除く．
+
+        Args:
+            ranked_list (list[any, any, any]): 重複を含んでいる可能性がある3要素リスト．
+            ks (int): リストの最大サイズ.
+        
+        Returns:
+            ranked_list (list[any, any, any]): 最大サイズksの重複を含まない3要素リスト．
+        """
+        res = []
+        for i, j, l in ranked_list:
+            flg = True
+            for k, m in res: #i,l
+                if self.real_tables[i].equals(self.real_tables[k]): #iとkのテーブルが同じとき
+                    flg = False
+                    break
+            if flg:
+                res.append((i, l))
+
+            if len(res) == ks:
+                break
+        return res
+    
+    def remove_dup_with_scores(self, ranked_list, ks):
+        """
+        3要素リストの重複を取り除く．
+
+        Args:
+            ranked_list (list[any, any, any]): 重複を含んでいる可能性がある3要素リスト．
+            ks (int): リストの最大サイズ.
+        
+        Returns:
+            ranked_list (list[any, any, any]): 最大サイズksの重複を含まない3要素リスト．
+        """
+        res = []
+        for i, j, l in ranked_list:
+            flg = True
+            for k, m, n in res: #i,l
+                if self.real_tables[i].equals(self.real_tables[k]): #iとkのテーブルが同じとき
+                    flg = False
+                    break
+            if flg:
+                res.append([i, j, l])
+
+            if len(res) == ks:
+                break
+        return res
+
+
+    def search_similar_tables_threshold2(
+        self, query, beta, k, theta, thres_key_cache, thres_key_prune, tflag=False
+    ):
+
+        self.query = query
+        self.query_fd = {}
+        self.already_map = {}
+        SM_test = SchemaMapping()
+
+        start_time1 = timeit.default_timer()
+
+        for i in self.schema_linking.keys():
+            self.already_map[i] = {}
+
+        query_col = self.sketch_query_cols(query)
+        self.sketch_column_and_row_for_meta_mapping()#追加
+        self.sample_rows_for_each_column()#追加
+
+        
+        time1 = 0
+        start_time = timeit.default_timer()
+        # Do mapping
+        meta_mapping = SM_test.mapping_naive_tables(
+            self.query,
+            query_col,
+            self.schema_element_sample_col, # self.schema_element_sample_col,
+            self.schema_element_dtype, # self.schema_element_dtype,
+        )
+        end_time = timeit.default_timer()
+        time1 += end_time - start_time
+        
+        
+        # Compute unmatched pairs
+        unmatched = {}
+        for i in meta_mapping.keys():
+            unmatched[i] = {}
+            for j in query.columns.tolist(): # .tolist(): リスト型listに変換
+                unmatched[i][j] = {}
+                if (j in query_col) and (j not in meta_mapping[i]):
+                    #for l in self.schema_element_sample_row[i].keys():
+                    for l in self.schema_element_sample_row[i].keys():
+                        unmatched[i][j][l] = ""
+
+
+        top_tables = []
+        Cache_MaxSim = {}
+
+        rank2 = []
+        rank_candidate = []
+
+
+        #for i in self.real_tables.keys():
+        for i in self.real_tables.keys():
+
+            tname = i
+            #gid = self.table_group[tname[6:]]
+            gid = self.table_group[tname]
+            if gid not in meta_mapping:
+                continue
+
+            #tableS = self.query
+            tableS = query
+            #tableR = self.real_tables[i]
+            tableR = self.real_tables[i]
+
+            start_time = timeit.default_timer()
+            #SM, ms = self.schema_mapping(tableS, tableR, meta_mapping, gid)
+            SM, ms = self.schema_mapping(tableS, tableR, meta_mapping, gid)
+            end_time = timeit.default_timer()
+            time1 = time1 + end_time - start_time
+            Cache_MaxSim[tname] = ms
+
+            if len(SM.items()) == 0:
+                continue
+
+            tableSnotintableR = []
+            for sk in tableS.columns.tolist(): # .tolist(): リスト型listに変換
+                if sk not in SM:
+                    tableSnotintableR.append(sk)
+
+            vname_score = float(1) / float(
+                len(tableR.columns.values) + len(tableSnotintableR)
+            )
+
+            vname_score2 = float(
+                min(len(tableS.columns.tolist()), len(tableR.columns.tolist())) - 1
+            ) / float(len(tableR.columns.values) + len(tableSnotintableR) - 1)
+
+            ubound = beta * vname_score2 + float(1 - beta) * Cache_MaxSim[tname]
+
+            rank2.append(ubound)
+            rank_candidate.append((tname, vname_score, SM))
+
+        rank2 = sorted(rank2, reverse=True)
+        rank_candidate = sorted(rank_candidate, key=lambda d: d[1], reverse=True)
+
+        
+        if len(rank_candidate) == 0:
+            return []
+
+        if len(rank_candidate) > k:
+            ks = k
+        else:
+            ks = len(rank_candidate)
+            
+        for i in range(ks):
+            #tableR = self.real_tables[rank_candidate[i][0]]
+            tableR = self.real_tables[rank_candidate[i][0]]
+            #gid = self.table_group[rank_candidate[i][0][6:]]
+            gid = self.table_group[rank_candidate[i][0]]
+            """
+            SM_real = rank_candidate[i][2]
+            (
+                score,
+                meta_mapping,
+                unmatched,
+                sm_time,
+                key_chosen,
+            ) = comp_table_similarity_key(
+                SM_test,
+                query, #self.query,
+                tableR,#beta,
+                SM_real,
+                gid,
+                meta_mapping,
+                schema_linking, #self.schema_linking,
+                thres_key_prune,
+                thres_key_cache,
+                already_map,
+                query_fd,
+            )
+            """
+            SM_real = rank_candidate[i][2]
+            (
+                col_sim,
+                row_sim,
+                meta_mapping,
+                unmatched,
+                sm_time,
+                key_chosen,
+            ) = self.comp_table_similarity_key(
+                SM_test,
+                query,
+                tableR,
+                SM_real,
+                gid,
+                meta_mapping,
+                self.schema_linking, # self.schema_linking,
+                thres_key_prune,
+                thres_key_cache,
+                unmatched,
+            )
+            score = beta * col_sim + float(1 - beta) * row_sim #追加
+            #score = float(1 - beta) * col_sim + beta * row_sim #追加
+            top_tables.append((rank_candidate[i][0], score, key_chosen))
+            time1 += sm_time
+
+        top_tables = sorted(top_tables, key=lambda d: d[1], reverse=True)
+        min_value = top_tables[-1][1]
+        
+        ks = ks - 1
+        id = 0
+        while True:
+            if ks + id >= len(rank_candidate):
+                break
+
+            threshold = beta * rank_candidate[ks + id][1] + float(1 - beta) * rank2[0]
+
+            if threshold <= min_value * theta:
+                break
+            else:
+                id = id + 1
+                if ks + id >= len(rank_candidate):
+                    break
+
+                #tableR = self.real_tables[rank_candidate[ks + id][0]]
+                tableR = self.real_tables[rank_candidate[ks + id][0]]
+                #gid = self.table_group[rank_candidate[ks + id][0][6:]]
+                gid = self.table_group[rank_candidate[ks + id][0]]
+                SM_real = rank_candidate[ks + id][2]
+                (
+                    col_sim,
+                    row_sim,
+                    meta_mapping,
+                    unmatched,
+                    sm_time,
+                    key_chosen,
+                    #rs,
+                    #meta_mapping,
+                    #unmatched,
+                    #sm_time,
+                    #key_chosen,
+                ) = self.comp_table_similarity_key(
+                    SM_test,
+                    query,
+                    tableR,
+                    SM_real,
+                    gid,
+                    meta_mapping,
+                    self.schema_linking, # self.schema_linking,
+                    thres_key_prune,
+                    thres_key_cache,
+                    unmatched,
+                    #SM_test,
+                    #self.query,
+                    #tableR,
+                    #beta,
+                    #SM_real,
+                    #gid,
+                    #meta_mapping,
+                    #self.schema_linking,
+                    #thres_key_prune,
+                    #thres_key_cache,
+                    #unmatched,
+                )
+                time1 += sm_time
+                #new_score = rs
+                new_score = beta * col_sim + float(1 - beta) * row_sim #追加
+
+                if new_score <= min_value:
+                    continue
+                else:
+                    top_tables.append(
+                        (rank_candidate[ks + id][0], new_score, key_chosen)
+                    )
+                    top_tables = sorted(top_tables, key=lambda d: d[1], reverse=True)
+                    min_value = top_tables[ks][1]
+
+        end_time1 = timeit.default_timer()
+        time3 = end_time1 - start_time1
+
+        logging.info("Schema Mapping Costs: %s Seconds" % time1)
+        logging.info("Full Search Costs: %s Seconds" % time3)
+
+        rtables_names = self.remove_dup(top_tables, ks)
+
+        rtables = []
+        for i, j in rtables_names:
+            rtables.append((i, self.real_tables[i]))
+
+        return rtables
+
+    def search_similar_tables_threshold2_with_scores(
+        self, query, beta, k, theta, thres_key_cache, thres_key_prune, tflag=False
+    ):
+
+        self.query = query
+        self.query_fd = {}
+        self.already_map = {}
+        SM_test = SchemaMapping()
+
+        start_time1 = timeit.default_timer()
+
+        for i in self.schema_linking.keys():
+            self.already_map[i] = {}
+
+        query_col = self.sketch_query_cols(query)
+        self.sketch_column_and_row_for_meta_mapping()#追加
+        self.sample_rows_for_each_column()#追加
+
+        
+        time1 = 0
+        start_time = timeit.default_timer()
+        # Do mapping
+        meta_mapping = SM_test.mapping_naive_tables(
+            self.query,
+            query_col,
+            self.schema_element_sample_col, # self.schema_element_sample_col,
+            self.schema_element_dtype, # self.schema_element_dtype,
+        )
+        end_time = timeit.default_timer()
+        time1 += end_time - start_time
+        
+        
+        # Compute unmatched pairs
+        unmatched = {}
+        for i in meta_mapping.keys():
+            unmatched[i] = {}
+            for j in query.columns.tolist(): # .tolist(): リスト型listに変換
+                unmatched[i][j] = {}
+                if (j in query_col) and (j not in meta_mapping[i]):
+                    #for l in self.schema_element_sample_row[i].keys():
+                    for l in self.schema_element_sample_row[i].keys():
+                        unmatched[i][j][l] = ""
+
+
+        top_tables = []
+        Cache_MaxSim = {}
+
+        rank2 = []
+        rank_candidate = []
+
+
+        #for i in self.real_tables.keys():
+        for i in self.real_tables.keys():
+
+            tname = i
+            #gid = self.table_group[tname[6:]]
+            gid = self.table_group[tname]
+            if gid not in meta_mapping:
+                continue
+
+            #tableS = self.query
+            tableS = query
+            #tableR = self.real_tables[i]
+            tableR = self.real_tables[i]
+
+            start_time = timeit.default_timer()
+            #SM, ms = self.schema_mapping(tableS, tableR, meta_mapping, gid)
+            SM, ms = self.schema_mapping(tableS, tableR, meta_mapping, gid)
+            end_time = timeit.default_timer()
+            time1 = time1 + end_time - start_time
+            Cache_MaxSim[tname] = ms
+
+            if len(SM.items()) == 0:
+                continue
+
+            tableSnotintableR = []
+            for sk in tableS.columns.tolist(): # .tolist(): リスト型listに変換
+                if sk not in SM:
+                    tableSnotintableR.append(sk)
+
+            vname_score = float(1) / float(
+                len(tableR.columns.values) + len(tableSnotintableR)
+            )
+
+            vname_score2 = float(
+                min(len(tableS.columns.tolist()), len(tableR.columns.tolist())) - 1
+            ) / float(len(tableR.columns.values) + len(tableSnotintableR) - 1)
+
+            ubound = beta * vname_score2 + float(1 - beta) * Cache_MaxSim[tname]
+
+            rank2.append(ubound)
+            rank_candidate.append((tname, vname_score, SM))
+
+        rank2 = sorted(rank2, reverse=True)
+        rank_candidate = sorted(rank_candidate, key=lambda d: d[1], reverse=True)
+
+        
+        if len(rank_candidate) == 0:
+            return []
+
+        if len(rank_candidate) > k:
+            ks = k
+        else:
+            ks = len(rank_candidate)
+            
+        for i in range(ks):
+            #tableR = self.real_tables[rank_candidate[i][0]]
+            tableR = self.real_tables[rank_candidate[i][0]]
+            #gid = self.table_group[rank_candidate[i][0][6:]]
+            gid = self.table_group[rank_candidate[i][0]]
+            """
+            SM_real = rank_candidate[i][2]
+            (
+                score,
+                meta_mapping,
+                unmatched,
+                sm_time,
+                key_chosen,
+            ) = comp_table_similarity_key(
+                SM_test,
+                query, #self.query,
+                tableR,#beta,
+                SM_real,
+                gid,
+                meta_mapping,
+                schema_linking, #self.schema_linking,
+                thres_key_prune,
+                thres_key_cache,
+                already_map,
+                query_fd,
+            )
+            """
+            SM_real = rank_candidate[i][2]
+            (
+                col_sim,
+                row_sim,
+                meta_mapping,
+                unmatched,
+                sm_time,
+                key_chosen,
+            ) = self.comp_table_similarity_key(
+                SM_test,
+                query,
+                tableR,
+                SM_real,
+                gid,
+                meta_mapping,
+                self.schema_linking, # self.schema_linking,
+                thres_key_prune,
+                thres_key_cache,
+                unmatched,
+            )
+            score = beta * col_sim + float(1 - beta) * row_sim #追加
+            #score = float(1 - beta) * col_sim + beta * row_sim #追加
+            top_tables.append((rank_candidate[i][0], score, key_chosen))
+            time1 += sm_time
+
+        top_tables = sorted(top_tables, key=lambda d: d[1], reverse=True)
+        min_value = top_tables[-1][1]
+        
+        ks = ks - 1
+        id = 0
+        while True:
+            if ks + id >= len(rank_candidate):
+                break
+
+            threshold = beta * rank_candidate[ks + id][1] + float(1 - beta) * rank2[0]
+
+            if threshold <= min_value * theta:
+                break
+            else:
+                id = id + 1
+                if ks + id >= len(rank_candidate):
+                    break
+
+                #tableR = self.real_tables[rank_candidate[ks + id][0]]
+                tableR = self.real_tables[rank_candidate[ks + id][0]]
+                #gid = self.table_group[rank_candidate[ks + id][0][6:]]
+                gid = self.table_group[rank_candidate[ks + id][0]]
+                SM_real = rank_candidate[ks + id][2]
+                (
+                    col_sim,
+                    row_sim,
+                    meta_mapping,
+                    unmatched,
+                    sm_time,
+                    key_chosen,
+                    #rs,
+                    #meta_mapping,
+                    #unmatched,
+                    #sm_time,
+                    #key_chosen,
+                ) = self.comp_table_similarity_key(
+                    SM_test,
+                    query,
+                    tableR,
+                    SM_real,
+                    gid,
+                    meta_mapping,
+                    self.schema_linking, # self.schema_linking,
+                    thres_key_prune,
+                    thres_key_cache,
+                    unmatched,
+                    #SM_test,
+                    #self.query,
+                    #tableR,
+                    #beta,
+                    #SM_real,
+                    #gid,
+                    #meta_mapping,
+                    #self.schema_linking,
+                    #thres_key_prune,
+                    #thres_key_cache,
+                    #unmatched,
+                )
+                time1 += sm_time
+                #new_score = rs
+                new_score = beta * col_sim + float(1 - beta) * row_sim #追加
+
+                if new_score <= min_value:
+                    continue
+                else:
+                    top_tables.append(
+                        (rank_candidate[ks + id][0], new_score, key_chosen)
+                    )
+                    top_tables = sorted(top_tables, key=lambda d: d[1], reverse=True)
+                    min_value = top_tables[ks][1]
+
+        end_time1 = timeit.default_timer()
+        time3 = end_time1 - start_time1
+
+        logging.info("Schema Mapping Costs: %s Seconds" % time1)
+        logging.info("Full Search Costs: %s Seconds" % time3)
+
+        rtables_names = self.remove_dup_with_scores(top_tables, ks)
+
+        rtables = []
+        for i, j, l in rtables_names:
+            rtables.append([i, self.real_tables[i], j])
+
+        return rtables
+
+
+    def calc_table_rel_using_juneau(self, tnameA, tableA, k_juneau):
+        rtables=self.search_similar_tables_threshold2_with_scores(query=tableA, beta=0.1, k=k_juneau, theta=10, thres_key_cache=0.2, thres_key_prune=0.9, tflag=True)
+        for tname, _, score in rtables:
+            tgroup = self.table_group[tname]
+            for tnameB, tgroupB in self.table_group.items():
+                if tgroup == tgroupB:
+                    self.calculated_sim[(tnameA, tnameB)]=score
+
+    def calc_all_tables_rel_using_juneau(self, k_juneau=20):
+        """
+        クエリセット後かつ検索の実行前にこれを実行するとjuneauを適用できる．
+        """
+        self.flg_juneau=True
+        for tnameA, tableA in self.query_table.items():
+            #tableA = self.fetch_var_table(nname)
+            self.calc_table_rel_using_juneau(tnameA,tableA, k_juneau)
+
+
+    def calculate_table_similarities_using_juneau(self):
+        self.init_schema_mapping()
+
+        rtables=self.search_similar_tables_threshold2(query=self.fetch_var_table(f"3_df_edaonindiancuisine"), beta=0.1, k=10, theta=10, thres_key_cache=0.2, thres_key_prune=0.9, tflag=True)
+
+        pass
