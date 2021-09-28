@@ -118,6 +118,9 @@ class WorkflowMatching:
         self.calc_v_microbenchmark={"load":0, "set":0, "column_rel":0, "sort":0, "table_rel":0}
         
         self.flg_juneau=flg_juneau
+        self.dict_nb_name_and_cleaned_nb_name={}
+        self.dict_nb_name_and_cleaned_nb_name2={}
+        self.load_json={}
 
 
 
@@ -1281,7 +1284,8 @@ class WorkflowMatching:
             nb_name=nb_name[nb_name.rfind("_")+1:]
             if nb_name not in self.valid_nb_name:
                 return True
-            self.G.add_node(node["name"], node_type="Var", nb_name=nb_name, data_type=node["data_type"])
+            #self.G.add_node(node["name"], node_type="Var", nb_name=nb_name, data_type=node["data_type"])
+            self.G.add_node(node["name"], node_type="Var", nb_name=nb_name)
         elif node.has_label("Cell"):
             if node["nb_name"] not in self.valid_nb_name:
                 return True
@@ -1289,7 +1293,8 @@ class WorkflowMatching:
         elif node.has_label("Display_data"):
             if node["nb_name"] not in self.valid_nb_name:
                 return True
-            self.G.add_node(node["name"], node_type="Display_data", nb_name=node["nb_name"], display_type=node["data_type"], cell_id=node["real_cell_id"])
+            #self.G.add_node(node["name"], node_type="Display_data", nb_name=node["nb_name"], display_type=node["data_type"], cell_id=node["real_cell_id"])
+            self.G.add_node(node["name"], node_type="Display_data", nb_name=node["nb_name"], display_type=node["data_type"])
         return err
     
     # 使用
@@ -1335,7 +1340,8 @@ class WorkflowMatching:
             nb_name=nb_name[nb_name.rfind("_")+1:]
             if nb_name not in self.valid_nb_name:
                 return True
-            self.G.add_node(node["name"], node_type="Var", nb_name=nb_name, data_type=node["data_type"])
+            #self.G.add_node(node["name"], node_type="Var", nb_name=nb_name, data_type=node["data_type"])
+            self.G.add_node(node["name"], node_type="Var", nb_name=nb_name)
             self.init_db_workflow_info(nb_name)
             self.db_workflow_info[nb_name]["Var"]+=1
         elif node.has_label("Cell"):
@@ -1347,7 +1353,8 @@ class WorkflowMatching:
         elif node.has_label("Display_data"):
             if node["nb_name"] not in self.valid_nb_name:
                 return True
-            self.G.add_node(node["name"], node_type="Display_data", nb_name=node["nb_name"], display_type=node["data_type"], cell_id=node["cell_id"])
+            #self.G.add_node(node["name"], node_type="Display_data", nb_name=node["nb_name"], display_type=node["data_type"], cell_id=node["cell_id"])
+            self.G.add_node(node["name"], node_type="Display_data", nb_name=node["nb_name"], display_type=node["data_type"])
             self.init_db_workflow_info(nb_name)
             if node in self.attr_of_q_display_type:
                 display_type = self.attr_of_q_display_type[node]
@@ -5902,28 +5909,6 @@ class WorkflowMatching:
             tableR = self.real_tables[rank_candidate[i][0]]
             #gid = self.table_group[rank_candidate[i][0][6:]]
             gid = self.table_group[rank_candidate[i][0]]
-            """
-            SM_real = rank_candidate[i][2]
-            (
-                score,
-                meta_mapping,
-                unmatched,
-                sm_time,
-                key_chosen,
-            ) = comp_table_similarity_key(
-                SM_test,
-                query, #self.query,
-                tableR,#beta,
-                SM_real,
-                gid,
-                meta_mapping,
-                schema_linking, #self.schema_linking,
-                thres_key_prune,
-                thres_key_cache,
-                already_map,
-                query_fd,
-            )
-            """
             SM_real = rank_candidate[i][2]
             (
                 col_sim,
@@ -5979,11 +5964,6 @@ class WorkflowMatching:
                     unmatched,
                     sm_time,
                     key_chosen,
-                    #rs,
-                    #meta_mapping,
-                    #unmatched,
-                    #sm_time,
-                    #key_chosen,
                 ) = self.comp_table_similarity_key(
                     SM_test,
                     query,
@@ -5991,21 +5971,10 @@ class WorkflowMatching:
                     SM_real,
                     gid,
                     meta_mapping,
-                    self.schema_linking, # self.schema_linking,
+                    self.schema_linking,
                     thres_key_prune,
                     thres_key_cache,
                     unmatched,
-                    #SM_test,
-                    #self.query,
-                    #tableR,
-                    #beta,
-                    #SM_real,
-                    #gid,
-                    #meta_mapping,
-                    #self.schema_linking,
-                    #thres_key_prune,
-                    #thres_key_cache,
-                    #unmatched,
                 )
                 time1 += sm_time
                 #new_score = rs
