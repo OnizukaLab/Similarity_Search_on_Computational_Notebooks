@@ -6028,3 +6028,163 @@ class WorkflowMatching:
         rtables=self.search_similar_tables_threshold2(query=self.fetch_var_table(f"3_df_edaonindiancuisine"), beta=0.1, k=10, theta=10, thres_key_cache=0.2, thres_key_prune=0.9, tflag=True)
 
         pass
+
+    def search_using_only_juneau(self, k_juneau):
+        for tnameA, tableA in self.query_table.items():
+            #tableA = self.fetch_var_table(nname)
+            rtables=self.search_similar_tables_threshold2_with_scores(query=tableA, beta=0.1, k=k_juneau, theta=10, thres_key_cache=0.2, thres_key_prune=0.9, tflag=True)
+            for tnameB, _, score in rtables:
+                nb_name = tnameB[tnameB.rfind("_")+1:]
+                if nb_name not in self.nb_score:
+                    self.nb_score[nb_name] = 0
+                self.nb_score[nb_name] += score
+            
+    """
+    def load_artifical_dataset_to_dict(self, dataset_size=10):
+        valid_nb_name2=[]
+        valid_nb_name2_append=valid_nb_name2.append
+        for copy_id in range(dataset_size-1):
+            for cleaned_nb_name in self.valid_nb_name:
+                new_cleaned_nb_name=f"{cleaned_nb_name}cp{copy_id}"
+                v=self.dict_nb_name_and_cleaned_nb_name[cleaned_nb_name]
+                new_nb_name = v[:v.rfind(".ipynb")] + f"_copy{copy_id}" + ".ipynb"
+                valid_nb_name2_append(new_cleaned_nb_name)
+                self.dict_nb_name_and_cleaned_nb_name[new_cleaned_nb_name] = new_nb_name
+                self.dict_nb_name_and_cleaned_nb_name2[new_nb_name] = new_cleaned_nb_name
+        self.valid_nb_name=self.valid_nb_name+valid_nb_name2
+
+    def load_artifical_dataset(self, dataset_size=10, change_id_list_path=f"{current_dir_path}/similarity_retrieval_system/for_build_artifical_dataset/change_id_list.csv"):
+        self.load_artifical_dataset_to_dict(dataset_size)
+        with open(change_id_list_path, mode="r") as f:
+            read_lines=f.read()
+        change_id_list=read_lines.split("\n")
+
+        node_list=[]
+        node_list_append=node_list.append
+        all_nodes_list = list(self.G.nodes())
+        for nb_name in self.valid_nb_name:
+            # 与えられたノートブック名の nodeを全て集める
+            for n in all_nodes_list:
+                if self.attr_of_db_nb_name[n] == nb_name:
+                    node_list_append(n)
+            # edgeを全て集める
+            for e in self.G.edges():
+                if n in e and delete_node not in e:
+                    edge_list_append(e)
+        node_num = len(node_list)  
+    """
+    
+    """人工データセット適用"""
+    def load_artifical_dataset(self, dataset_size, change_id_list_path):
+        """人工データセット読み込み"""
+        
+        with open(change_id_list_path, mode="r") as f:
+            read_lines=f.read()
+        change_id_list=read_lines.split("\n")
+
+        all_nodes_list = list(self.G.nodes())
+        valid_nb_name2=[]
+        valid_nb_name2_append=valid_nb_name2.append
+        cell_num=0
+        node_correspondence_dict={}
+        for n in all_nodes_list:
+            if "cell" in n:
+                cell_num = max(int(n[n.rfind("_")+1:]), cell_num)
+        for copy_id in range(dataset_size-1):
+            for cleaned_nb_name in self.valid_nb_name:
+                new_cleaned_nb_name=f"{cleaned_nb_name}cp{copy_id}"
+                v=self.dict_nb_name_and_cleaned_nb_name[cleaned_nb_name]
+                new_nb_name = v[:v.rfind(".ipynb")] + f"_copy{copy_id}" + ".ipynb"
+                valid_nb_name2_append(new_cleaned_nb_name)
+                self.dict_nb_name_and_cleaned_nb_name[new_cleaned_nb_name] = new_nb_name
+                self.dict_nb_name_and_cleaned_nb_name2[new_nb_name] = new_cleaned_nb_name
+
+                id_and_operation = []
+                op=""
+                for r in change_id_list:
+                    if new_cleaned_nb_name in r:
+                        id_and_operation = r.replace(" ","").split(",\t")
+                        op = id_and_operation[2]
+                        break
+
+                if op == "delete":
+                    delete_node = id_and_operation[3]
+                    # 与えられたノートブック名の nodeを全て複製
+                    for n in all_nodes_list:
+                        if "Cell" in n:
+                            cell_num = max(int(n[:n.rfind("_")]), cell_num)
+                    for n in all_nodes_list:
+                        if self.attr_of_db_nb_name[n] == cleaned_nb_name:
+                            if n == delete_node:
+                                continue
+                            if self.attr_of_db_node_type[n] == "Cell":
+                                cell_num+=1
+                                node_name = f"Cell_{cell_num}"
+                                real_cell_id=self.attr_of_db_real_cell_id[new_cleaned_nb_name]
+                                self.G.add_node(node_name, node_type="Cell", nb_name=new_cleaned_nb_name, real_cell_id=real_cell_id)
+                            elif self.attr_of_db_node_type[n] == "Var":
+                                node_name=f"{n}cp{copy_id}"
+                                self.G.add_node(node_name, node_type="Var", nb_name=new_cleaned_nb_name)
+                            elif self.attr_of_db_node_type[n] == "Display_data":
+                                node_name=f"{n}cp{copy_id}"
+                                display_type=self.attr_of_db_display_type[n]
+                                self.G.add_node(node_name, node_type="Display_data", nb_name=new_cleaned_nb_name, display_type=display_type)
+                            else:
+                                logging.error("err: ノードのタイプがいずれにも一致していない")
+                            node_correspondence_dict[n]=node_name
+                    for e in self.G.edges():
+                        if n in e and delete_node not in e:
+                            self.G.add_edge(node_correspondence_dict[e[0]], node_correspondence_dict[e[1]])
+                elif op == "add":
+                    selected_node = id_and_operation[3]
+                    add_node = id_and_operation[4]
+                    # 与えられたノートブック名の nodeを全て複製
+                    for n in all_nodes_list:
+                        if "Cell" in n:
+                            cell_num = max(int(n[:n.rfind("_")]), cell_num)
+                    for n in all_nodes_list:
+                        if self.attr_of_db_nb_name[n] == cleaned_nb_name or n == add_node:
+                            if self.attr_of_db_node_type[n] == "Cell":
+                                cell_num+=1
+                                node_name = f"Cell_{cell_num}"
+                                real_cell_id=self.attr_of_db_real_cell_id[new_cleaned_nb_name]
+                                self.G.add_node(node_name, node_type="Cell", nb_name=new_cleaned_nb_name, real_cell_id=real_cell_id)
+                            elif self.attr_of_db_node_type[n] == "Var":
+                                node_name=f"{n}cp{copy_id}"
+                                self.G.add_node(node_name, node_type="Var", nb_name=new_cleaned_nb_name)
+                            elif self.attr_of_db_node_type[n] == "Display_data":
+                                node_name=f"{n}cp{copy_id}"
+                                display_type=self.attr_of_db_display_type[n]
+                                self.G.add_node(node_name, node_type="Display_data", nb_name=new_cleaned_nb_name, display_type=display_type)
+                            else:
+                                logging.error("err: ノードのタイプがいずれにも一致していない")
+                            node_correspondence_dict[n]=node_name
+                    for e in self.G.edges():
+                        if n in e:
+                            self.G.add_edge(node_correspondence_dict[e[0]], node_correspondence_dict[e[1]])
+                        self.G.add_edge(node_correspondence_dict[selected_node], node_correspondence_dict[add_node])
+                else: #何も操作しない場合
+                    # 与えられたノートブック名の nodeを全て複製
+                    for n in all_nodes_list:
+                        if self.attr_of_db_nb_name[n] == cleaned_nb_name:
+                            if self.attr_of_db_node_type[n] == "cell":
+                                cell_num+=1
+                                node_name = f"cell_{cell_num}"
+                                real_cell_id=self.attr_of_db_real_cell_id[new_cleaned_nb_name]
+                                self.G.add_node(node_name, node_type="Cell", nb_name=new_cleaned_nb_name, real_cell_id=real_cell_id)
+                            elif self.attr_of_db_node_type[n] == "Var":
+                                node_name=f"{n}cp{copy_id}"
+                                self.G.add_node(node_name, node_type="Var", nb_name=new_cleaned_nb_name)
+                            elif self.attr_of_db_node_type[n] == "Display_data":
+                                node_name=f"{n}cp{copy_id}"
+                                display_type=self.attr_of_db_display_type[n]
+                                self.G.add_node(node_name, node_type="Display_data", nb_name=new_cleaned_nb_name, display_type=display_type)
+                            else:
+                                logging.error("err: ノードのタイプがいずれにも一致していない")
+                            node_correspondence_dict[n]=node_name
+                    for e in self.G.edges():
+                        if n in e:
+                            self.G.add_edge(node_correspondence_dict[e[0]], node_correspondence_dict[e[1]])
+        self.valid_nb_name=self.valid_nb_name+valid_nb_name2
+
+
