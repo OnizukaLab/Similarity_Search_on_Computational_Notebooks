@@ -2,10 +2,9 @@
 
 ## The components of our system
 
-Our system uses PostgreSQL and Neo4j as DBMS. Our system also uses Jupyter Notebook to display the search results , and [Juneau](https://github.com/juneau-project/juneau.git) to transform computational notebooks into graphs and compute some similarities. 
+Our system uses PostgreSQL and Neo4j as DBMS. Our system also uses Jupyter Notebook to display the search results, and [Juneau](https://github.com/juneau-project/juneau.git) to transform computational notebooks into graphs and compute some similarities. 
 
 Before searching, transformed computational notebooks must be stored into them.
-The sample data is now in preparation.
 
 ## Preparation
 
