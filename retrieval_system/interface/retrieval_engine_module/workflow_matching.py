@@ -42,6 +42,8 @@ from mymodule.code_relatedness import CodeRelatedness
 from juneau.db.schemamapping import SchemaMapping
 #from lib import CodeComparer
 
+NUM_STR_LIST = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+
 
 class WorkflowMatching:
     """
@@ -121,6 +123,7 @@ class WorkflowMatching:
         self.dict_nb_name_and_cleaned_nb_name={}
         self.dict_nb_name_and_cleaned_nb_name2={}
         self.load_json={}
+        self.flg_use_artifical_dataset=False
 
 
 
@@ -6077,6 +6080,7 @@ class WorkflowMatching:
     """人工データセット適用"""
     def load_artifical_dataset(self, dataset_size, change_id_list_path):
         """人工データセット読み込み"""
+        self.flg_use_artifical_dataset=True
         
         with open(change_id_list_path, mode="r") as f:
             read_lines=f.read()
@@ -6092,6 +6096,17 @@ class WorkflowMatching:
                 cell_num = max(int(n[n.rfind("_")+1:]), cell_num)
         for copy_id in range(dataset_size-1):
             for cleaned_nb_name in self.valid_nb_name:
+                # cleaned_nb_nameの語尾がcp1などの場合，それは人工データなので除く
+                if cleaned_nb_name[-1:] in NUM_STR_LIST:
+                    if cleaned_nb_name[-2:-1] in NUM_STR_LIST:
+                        if cleaned_nb_name[-3:-2] in NUM_STR_LIST and cleaned_nb_name[-5:-3] == "cp":
+                            continue
+                        elif cleaned_nb_name[-4:-2] == "cp":
+                            continue
+                    elif cleaned_nb_name[-3:-1] == "cp":
+                        continue
+                    
+
                 new_cleaned_nb_name=f"{cleaned_nb_name}cp{copy_id}"
                 v=self.dict_nb_name_and_cleaned_nb_name[cleaned_nb_name]
                 new_nb_name = v[:v.rfind(".ipynb")] + f"_copy{copy_id}" + ".ipynb"
@@ -6111,27 +6126,28 @@ class WorkflowMatching:
                     delete_node = id_and_operation[3]
                     # 与えられたノートブック名の nodeを全て複製
                     for n in all_nodes_list:
-                        if "Cell" in n:
-                            cell_num = max(int(n[:n.rfind("_")]), cell_num)
-                    for n in all_nodes_list:
+                        if n not in self.attr_of_db_nb_name:
+                            continue
                         if self.attr_of_db_nb_name[n] == cleaned_nb_name:
                             if n == delete_node:
                                 continue
                             if self.attr_of_db_node_type[n] == "Cell":
                                 cell_num+=1
-                                node_name = f"Cell_{cell_num}"
-                                real_cell_id=self.attr_of_db_real_cell_id[new_cleaned_nb_name]
+                                node_name = f"cell_{cell_num}"
+                                real_cell_id=self.attr_of_db_real_cell_id[n]
                                 self.G.add_node(node_name, node_type="Cell", nb_name=new_cleaned_nb_name, real_cell_id=real_cell_id)
+                                node_correspondence_dict[n]=node_name
                             elif self.attr_of_db_node_type[n] == "Var":
                                 node_name=f"{n}cp{copy_id}"
                                 self.G.add_node(node_name, node_type="Var", nb_name=new_cleaned_nb_name)
+                                node_correspondence_dict[n]=node_name
                             elif self.attr_of_db_node_type[n] == "Display_data":
                                 node_name=f"{n}cp{copy_id}"
                                 display_type=self.attr_of_db_display_type[n]
                                 self.G.add_node(node_name, node_type="Display_data", nb_name=new_cleaned_nb_name, display_type=display_type)
+                                node_correspondence_dict[n]=node_name
                             else:
-                                logging.error("err: ノードのタイプがいずれにも一致していない")
-                            node_correspondence_dict[n]=node_name
+                                logging.error(f"err: ノードのタイプがいずれにも一致していない．node_name:{n}, nb_name:{cleaned_nb_name}") # -> 新しく追加したものがここに入っている?
                     for e in self.G.edges():
                         if n in e and delete_node not in e:
                             self.G.add_edge(node_correspondence_dict[e[0]], node_correspondence_dict[e[1]])
@@ -6140,25 +6156,26 @@ class WorkflowMatching:
                     add_node = id_and_operation[4]
                     # 与えられたノートブック名の nodeを全て複製
                     for n in all_nodes_list:
-                        if "Cell" in n:
-                            cell_num = max(int(n[:n.rfind("_")]), cell_num)
-                    for n in all_nodes_list:
+                        if n not in self.attr_of_db_nb_name:
+                            continue
                         if self.attr_of_db_nb_name[n] == cleaned_nb_name or n == add_node:
                             if self.attr_of_db_node_type[n] == "Cell":
                                 cell_num+=1
-                                node_name = f"Cell_{cell_num}"
-                                real_cell_id=self.attr_of_db_real_cell_id[new_cleaned_nb_name]
+                                node_name = f"cell_{cell_num}"
+                                real_cell_id=self.attr_of_db_real_cell_id[n]
                                 self.G.add_node(node_name, node_type="Cell", nb_name=new_cleaned_nb_name, real_cell_id=real_cell_id)
+                                node_correspondence_dict[n]=node_name
                             elif self.attr_of_db_node_type[n] == "Var":
                                 node_name=f"{n}cp{copy_id}"
                                 self.G.add_node(node_name, node_type="Var", nb_name=new_cleaned_nb_name)
+                                node_correspondence_dict[n]=node_name
                             elif self.attr_of_db_node_type[n] == "Display_data":
                                 node_name=f"{n}cp{copy_id}"
                                 display_type=self.attr_of_db_display_type[n]
                                 self.G.add_node(node_name, node_type="Display_data", nb_name=new_cleaned_nb_name, display_type=display_type)
+                                node_correspondence_dict[n]=node_name
                             else:
-                                logging.error("err: ノードのタイプがいずれにも一致していない")
-                            node_correspondence_dict[n]=node_name
+                                logging.error(f"err: ノードのタイプがいずれにも一致していない．node_name:{n}, nb_name:{cleaned_nb_name}") # -> 新しく追加したものがここに入っている?
                     for e in self.G.edges():
                         if n in e:
                             self.G.add_edge(node_correspondence_dict[e[0]], node_correspondence_dict[e[1]])
@@ -6166,24 +6183,30 @@ class WorkflowMatching:
                 else: #何も操作しない場合
                     # 与えられたノートブック名の nodeを全て複製
                     for n in all_nodes_list:
+                        if n not in self.attr_of_db_nb_name:
+                            continue
                         if self.attr_of_db_nb_name[n] == cleaned_nb_name:
-                            if self.attr_of_db_node_type[n] == "cell":
+                            if self.attr_of_db_node_type[n] == "Cell":
                                 cell_num+=1
                                 node_name = f"cell_{cell_num}"
-                                real_cell_id=self.attr_of_db_real_cell_id[new_cleaned_nb_name]
+                                real_cell_id=self.attr_of_db_real_cell_id[n]
                                 self.G.add_node(node_name, node_type="Cell", nb_name=new_cleaned_nb_name, real_cell_id=real_cell_id)
+                                node_correspondence_dict[n]=node_name
                             elif self.attr_of_db_node_type[n] == "Var":
                                 node_name=f"{n}cp{copy_id}"
                                 self.G.add_node(node_name, node_type="Var", nb_name=new_cleaned_nb_name)
+                                node_correspondence_dict[n]=node_name
                             elif self.attr_of_db_node_type[n] == "Display_data":
                                 node_name=f"{n}cp{copy_id}"
                                 display_type=self.attr_of_db_display_type[n]
                                 self.G.add_node(node_name, node_type="Display_data", nb_name=new_cleaned_nb_name, display_type=display_type)
+                                node_correspondence_dict[n]=node_name
                             else:
-                                logging.error("err: ノードのタイプがいずれにも一致していない")
-                            node_correspondence_dict[n]=node_name
+                                logging.error(f"err: ノードのタイプがいずれにも一致していない．node_name:{n}, nb_name:{cleaned_nb_name}") # -> 新しく追加したものがここに入っている?
                     for e in self.G.edges():
                         if n in e:
+                            if e[0] not in node_correspondence_dict or e[1] not in node_correspondence_dict:
+                                continue
                             self.G.add_edge(node_correspondence_dict[e[0]], node_correspondence_dict[e[1]])
         self.valid_nb_name=self.valid_nb_name+valid_nb_name2
 
