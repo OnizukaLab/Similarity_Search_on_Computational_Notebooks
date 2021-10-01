@@ -32,6 +32,7 @@ import timeout_decorator
 import matplotlib.pyplot as plt
 import copy
 import random
+from typing import Union, List # annotations
 
 from py2neo import Node, Relationship, NodeMatcher, RelationshipMatcher
 from juneau.config import config
@@ -3078,7 +3079,7 @@ class WorkflowMatching:
             return 0.0
 
 
-    def calc_rel_c_o(self, n1_name, n2_name):
+    def calc_rel_c_o(self, n1_name:str, n2_name:str) -> float:
         class_code_relatedness=self.class_code_relatedness
         if self.attr_of_db_node_type[n2_name] == "Cell" and self.attr_of_q_node_type[n1_name] == "Cell": #type: cell
             if self.w_c==0:
@@ -3629,7 +3630,7 @@ class WorkflowMatching:
         return count, nb_count #あとで消す
 
     #使用
-    def calc_lib_score(self, lib_list1, lib_list2):
+    def calc_lib_score(self, lib_list1:list, lib_list2:list) -> float:
         """
         ライブラリ類似度を計算する．
 
@@ -3702,20 +3703,25 @@ class WorkflowMatching:
                 self.top_k_score_l.append((nb_name, sorted_nb_score[nb_name]))  
         print(self.top_k_score)       
 
-    def fetch_source_code_table(self, cleaned_nb_name):
-        #return 0.5
+    def fetch_source_code_table(self, cleaned_nb_name:str) -> pd.DataFrame:
         if cleaned_nb_name in self.cell_source_code:
             return self.cell_source_code[cleaned_nb_name]
         
+        if self.flg_use_artifical_dataset and self.is_artifical_dataset(cleaned_nb_name):
+            load_name = cleaned_nb_name[:cleaned_nb_name.rfind("cp")]
+        else:
+            load_name  = cleaned_nb_name
+
+        
         with self.postgres_eng.connect() as conn:
             try:
-                code_table = pd.read_sql_table(f"cellcont_{cleaned_nb_name}", conn, schema=f"{config.sql.cellcode}")
+                code_table = pd.read_sql_table(f"cellcont_{load_name}", conn, schema=f"{config.sql.cellcode}")
                 self.cell_source_code[cleaned_nb_name]=code_table
             except:
-                logging.info(f"error: collecting source code from db is failed.")
+                logging.error(f"error: collecting source code from db is failed.")
         return self.cell_source_code[cleaned_nb_name]
         
-    def fetch_var_table(self, table_name):
+    def fetch_var_table(self, table_name:str) -> pd.DataFrame:
         """
         Args:
             table_name (str): f'rtable{セル番号}_{変数名}_{NB名}'の文字列．
@@ -3723,12 +3729,18 @@ class WorkflowMatching:
         Returns:
             DataFrame
         """
+
+        if self.flg_use_artifical_dataset and self.is_artifical_dataset(table_name):
+            load_name = table_name[:table_name.rfind("cp")]
+        else:
+            load_name  = table_name
+
         with self.postgres_eng.connect() as conn:
             try:
-                var_table = pd.read_sql_table(f"rtable{table_name}", conn, schema=f"{config.sql.dbs}")
+                var_table = pd.read_sql_table(f"rtable{load_name}", conn, schema=f"{config.sql.dbs}")
                 return var_table
             except Exception as e:
-                logging.info(f"error: collecting var table '{table_name}' from db is failed because of {e}")
+                logging.error(f"error: collecting var table '{load_name}' from db is failed because of {e}")
                 return None
 
     def bench_mark_calc_cell_rel(self, cleaned_nb_name_A, cleaned_nb_name_B, ver="jaccard_similarity_coefficient"):
@@ -4184,7 +4196,7 @@ class WorkflowMatching:
             self.nb_name_group_id[nb_name]=max_gid+1
 
 
-    def fetch_all_library_from_db(self, cleaned_nb_name):
+    def fetch_all_library_from_db(self, cleaned_nb_name:str) -> List[str]:
         if cleaned_nb_name in self.library:
             return self.library[cleaned_nb_name]
         logging.info("collecting library info...")
@@ -5999,9 +6011,10 @@ class WorkflowMatching:
            
     
     """人工データセット適用"""
-    def load_artifical_dataset(self, dataset_size, change_id_list_path):
+    def load_artifical_dataset(self, dataset_size, change_id_list_path, change_libraries_list_path):
         """人工データセット読み込み"""
         self.flg_use_artifical_dataset=True
+        self.load_libraries_of_artifical_dataset(dataset_size, change_libraries_list_path)
         
         with open(change_id_list_path, mode="r") as f:
             read_lines=f.read()
@@ -6018,15 +6031,8 @@ class WorkflowMatching:
         for copy_id in range(dataset_size-1):
             for cleaned_nb_name in self.valid_nb_name:
                 # cleaned_nb_nameの語尾がcp1などの場合，それは人工データなので除く
-                if cleaned_nb_name[-1:] in NUM_STR_LIST:
-                    if cleaned_nb_name[-2:-1] in NUM_STR_LIST:
-                        if cleaned_nb_name[-3:-2] in NUM_STR_LIST and cleaned_nb_name[-5:-3] == "cp":
-                            continue
-                        elif cleaned_nb_name[-4:-2] == "cp":
-                            continue
-                    elif cleaned_nb_name[-3:-1] == "cp":
-                        continue
-                    
+                if self.is_artifical_dataset(cleaned_nb_name):
+                    continue                    
 
                 new_cleaned_nb_name=f"{cleaned_nb_name}cp{copy_id}"
                 v=self.dict_nb_name_and_cleaned_nb_name[cleaned_nb_name]
@@ -6131,4 +6137,37 @@ class WorkflowMatching:
                             self.G.add_edge(node_correspondence_dict[e[0]], node_correspondence_dict[e[1]])
         self.valid_nb_name=self.valid_nb_name+valid_nb_name2
 
+        self.attr_of_db_node_type=nx.get_node_attributes(self.G, "node_type")
+        self.attr_of_db_nb_name=nx.get_node_attributes(self.G, "nb_name")
+        self.attr_of_db_real_cell_id=nx.get_node_attributes(self.G, "real_cell_id")
+        self.attr_of_db_display_type=nx.get_node_attributes(self.G, "display_type")
+        self.set_all_label_node_list()
+        self.set_nb_node_list()
 
+
+    def load_libraries_of_artifical_dataset(self, dataset_size, change_libraries_list_path):
+        """
+        人工データとして、change_libraries_list.csvを読み込む。
+        """
+        with open(change_libraries_list_path, mode="r") as f:
+            load_contents=f.read()
+        change_libraries_list=load_contents.split("\n")
+        for r in change_libraries_list:
+            r_list=r.split(",\t")
+            self.library[r_list[0]]=r_list[1:]
+
+
+    def is_artifical_dataset(cleaned_nb_name):
+        """データセットを100倍まで増加させているとき"""
+        # cleaned_nb_nameの語尾がcp1などの場合，それは人工データなので除く
+        if "cp" not in cleaned_nb_name:
+            return False
+        elif cleaned_nb_name[-1:] in NUM_STR_LIST:
+            if cleaned_nb_name[-2:-1] in NUM_STR_LIST:
+                if cleaned_nb_name[-3:-2] in NUM_STR_LIST and cleaned_nb_name[-5:-3] == "cp":
+                    return True
+                elif cleaned_nb_name[-4:-2] == "cp":
+                    return True
+            elif cleaned_nb_name[-3:-1] == "cp":
+                return True
+        return False
