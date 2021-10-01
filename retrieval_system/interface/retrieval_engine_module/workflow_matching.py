@@ -1329,7 +1329,7 @@ class WorkflowMatching:
         if nb_name not in self.db_workflow_info:
             self.db_workflow_info[nb_name]={"Cell": 0, "Var": 0, "Display_data": {}, "max_indegree": 0, "max_outdegree": 0}
 
-    # set_db_graphで使用
+    # set_db_graphで使用？
     def add_node_to_graph_and_set_workflow_info(self, node):
         """
         add node to DiGraph 'self.G'
@@ -3945,44 +3945,6 @@ class WorkflowMatching:
         ret_score=1-(graph_edit_dist/self.normalization)
         return ret_score
 
-    #不使用
-    def bench_mark_calc_table_rel(self, limit=100):
-        time2=0
-        calc_count=0
-        node_list=[]
-        attr_list=nx.get_node_attributes(self.G, "node_type")
-        for n in attr_list:
-            if attr_list[n]=="Var":
-                node_list.append(n)
-
-        start_time1 = timeit.default_timer()
-        for n1_name in node_list:
-            if calc_count>=limit:
-                break
-            for n2_name in node_list:
-                if calc_count>=limit:
-                    break
-                if n1_name==n2_name:
-                    continue
-                start_time2 = timeit.default_timer()
-                tableA=self.fetch_var_table(n1_name)
-                if tableA is None:
-                    continue
-                tableB=self.fetch_var_table(n2_name)
-                if tableB is None:
-                    continue
-                sim = self.calc_table_rel(tableA, tableB)
-                end_time2 = timeit.default_timer()
-                time2+=end_time2-start_time2
-                print(sim)
-                calc_count+=1
-        end_time1 = timeit.default_timer()
-        time1=end_time1-start_time1
-        logging.info(f"calculated num of nb: {len(self.ans_list)}")
-        logging.info(f"calc time par nb: {time2/len(self.ans_list)}")
-        logging.info(f"calc time par 1 set of table: {time2/calc_count}")
-        return time1, time2, calc_count
-
     def calc_table_rel(self, tableA, tableB):
         """
         一時的に _tmp 付与している
@@ -6025,13 +5987,6 @@ class WorkflowMatching:
             self.calc_table_rel_using_juneau(tnameA,tableA, k_juneau)
 
 
-    def calculate_table_similarities_using_juneau(self):
-        self.init_schema_mapping()
-
-        rtables=self.search_similar_tables_threshold2(query=self.fetch_var_table(f"3_df_edaonindiancuisine"), beta=0.1, k=10, theta=10, thres_key_cache=0.2, thres_key_prune=0.9, tflag=True)
-
-        pass
-
     def search_using_only_juneau(self, k_juneau):
         for tnameA, tableA in self.query_table.items():
             #tableA = self.fetch_var_table(nname)
@@ -6041,41 +5996,7 @@ class WorkflowMatching:
                 if nb_name not in self.nb_score:
                     self.nb_score[nb_name] = 0
                 self.nb_score[nb_name] += score
-            
-    """
-    def load_artifical_dataset_to_dict(self, dataset_size=10):
-        valid_nb_name2=[]
-        valid_nb_name2_append=valid_nb_name2.append
-        for copy_id in range(dataset_size-1):
-            for cleaned_nb_name in self.valid_nb_name:
-                new_cleaned_nb_name=f"{cleaned_nb_name}cp{copy_id}"
-                v=self.dict_nb_name_and_cleaned_nb_name[cleaned_nb_name]
-                new_nb_name = v[:v.rfind(".ipynb")] + f"_copy{copy_id}" + ".ipynb"
-                valid_nb_name2_append(new_cleaned_nb_name)
-                self.dict_nb_name_and_cleaned_nb_name[new_cleaned_nb_name] = new_nb_name
-                self.dict_nb_name_and_cleaned_nb_name2[new_nb_name] = new_cleaned_nb_name
-        self.valid_nb_name=self.valid_nb_name+valid_nb_name2
-
-    def load_artifical_dataset(self, dataset_size=10, change_id_list_path=f"{current_dir_path}/similarity_retrieval_system/for_build_artifical_dataset/change_id_list.csv"):
-        self.load_artifical_dataset_to_dict(dataset_size)
-        with open(change_id_list_path, mode="r") as f:
-            read_lines=f.read()
-        change_id_list=read_lines.split("\n")
-
-        node_list=[]
-        node_list_append=node_list.append
-        all_nodes_list = list(self.G.nodes())
-        for nb_name in self.valid_nb_name:
-            # 与えられたノートブック名の nodeを全て集める
-            for n in all_nodes_list:
-                if self.attr_of_db_nb_name[n] == nb_name:
-                    node_list_append(n)
-            # edgeを全て集める
-            for e in self.G.edges():
-                if n in e and delete_node not in e:
-                    edge_list_append(e)
-        node_num = len(node_list)  
-    """
+           
     
     """人工データセット適用"""
     def load_artifical_dataset(self, dataset_size, change_id_list_path):
