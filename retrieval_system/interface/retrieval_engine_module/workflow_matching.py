@@ -6011,10 +6011,11 @@ class WorkflowMatching:
            
     
     """人工データセット適用"""
-    def load_artifical_dataset(self, dataset_size, change_id_list_path, change_libraries_list_path):
+    def load_artifical_dataset(self, dataset_size, change_id_list_path, change_libraries_list_path, retrieval_system_path):
         """人工データセット読み込み"""
         self.flg_use_artifical_dataset=True
         self.load_libraries_of_artifical_dataset(dataset_size, change_libraries_list_path)
+        self.load_dict_nb_name_and_cleaned_nb_name(retrieval_system_path)
         
         with open(change_id_list_path, mode="r") as f:
             read_lines=f.read()
@@ -6024,12 +6025,12 @@ class WorkflowMatching:
         valid_nb_name2=[]
         valid_nb_name2_append=valid_nb_name2.append
         cell_num=0
-        node_correspondence_dict={}
         for n in all_nodes_list:
             if "cell" in n:
                 cell_num = max(int(n[n.rfind("_")+1:]), cell_num)
         for copy_id in range(dataset_size-1):
             for cleaned_nb_name in self.valid_nb_name:
+                node_correspondence_dict={}
                 # cleaned_nb_nameの語尾がcp1などの場合，それは人工データなので除く
                 if self.is_artifical_dataset(cleaned_nb_name):
                     continue                    
@@ -6038,8 +6039,10 @@ class WorkflowMatching:
                 v=self.dict_nb_name_and_cleaned_nb_name[cleaned_nb_name]
                 new_nb_name = v[:v.rfind(".ipynb")] + f"_copy{copy_id}" + ".ipynb"
                 valid_nb_name2_append(new_cleaned_nb_name)
-                self.dict_nb_name_and_cleaned_nb_name[new_cleaned_nb_name] = new_nb_name
-                self.dict_nb_name_and_cleaned_nb_name2[new_nb_name] = new_cleaned_nb_name
+                if new_cleaned_nb_name not in self.dict_nb_name_and_cleaned_nb_name:
+                    self.dict_nb_name_and_cleaned_nb_name[new_cleaned_nb_name] = new_nb_name
+                if new_nb_name not in self.dict_nb_name_and_cleaned_nb_name2:
+                    self.dict_nb_name_and_cleaned_nb_name2[new_nb_name] = new_cleaned_nb_name
 
                 id_and_operation = []
                 op=""
@@ -6076,8 +6079,11 @@ class WorkflowMatching:
                             else:
                                 logging.error(f"err: ノードのタイプがいずれにも一致していない．node_name:{n}, nb_name:{cleaned_nb_name}") # -> 新しく追加したものがここに入っている?
                     for e in self.G.edges():
-                        if n in e and delete_node not in e:
-                            self.G.add_edge(node_correspondence_dict[e[0]], node_correspondence_dict[e[1]])
+                        if delete_node not in e:
+                            continue
+                        if e[0] in node_correspondence_dict and e[1] in node_correspondence_dict:
+                            continue
+                        self.G.add_edge(node_correspondence_dict[e[0]], node_correspondence_dict[e[1]])
                 elif op == "add":
                     selected_node = id_and_operation[3]
                     add_node = id_and_operation[4]
@@ -6104,9 +6110,11 @@ class WorkflowMatching:
                             else:
                                 logging.error(f"err: ノードのタイプがいずれにも一致していない．node_name:{n}, nb_name:{cleaned_nb_name}") # -> 新しく追加したものがここに入っている?
                     for e in self.G.edges():
-                        if n in e:
-                            self.G.add_edge(node_correspondence_dict[e[0]], node_correspondence_dict[e[1]])
-                        self.G.add_edge(node_correspondence_dict[selected_node], node_correspondence_dict[add_node])
+                        if e[0] in node_correspondence_dict and e[1] in node_correspondence_dict:
+                            continue
+                        self.G.add_edge(node_correspondence_dict[e[0]], node_correspondence_dict[e[1]])
+                    self.G.add_edge(node_correspondence_dict[selected_node], node_correspondence_dict[add_node])
+
                 else: #何も操作しない場合
                     # 与えられたノートブック名の nodeを全て複製
                     for n in all_nodes_list:
@@ -6131,10 +6139,9 @@ class WorkflowMatching:
                             else:
                                 logging.error(f"err: ノードのタイプがいずれにも一致していない．node_name:{n}, nb_name:{cleaned_nb_name}") # -> 新しく追加したものがここに入っている?
                     for e in self.G.edges():
-                        if n in e:
-                            if e[0] not in node_correspondence_dict or e[1] not in node_correspondence_dict:
-                                continue
-                            self.G.add_edge(node_correspondence_dict[e[0]], node_correspondence_dict[e[1]])
+                        if e[0] in node_correspondence_dict and e[1] in node_correspondence_dict:
+                            continue
+                        self.G.add_edge(node_correspondence_dict[e[0]], node_correspondence_dict[e[1]])
         self.valid_nb_name=self.valid_nb_name+valid_nb_name2
 
         self.attr_of_db_node_type=nx.get_node_attributes(self.G, "node_type")
@@ -6157,7 +6164,7 @@ class WorkflowMatching:
             self.library[r_list[0]]=r_list[1:]
 
 
-    def is_artifical_dataset(cleaned_nb_name):
+    def is_artifical_dataset(self, cleaned_nb_name):
         """データセットを100倍まで増加させているとき"""
         # cleaned_nb_nameの語尾がcp1などの場合，それは人工データなので除く
         if "cp" not in cleaned_nb_name:
@@ -6171,3 +6178,15 @@ class WorkflowMatching:
             elif cleaned_nb_name[-3:-1] == "cp":
                 return True
         return False
+
+    def load_dict_nb_name_and_cleaned_nb_name(self, retrieval_system_path:str):
+        with open(f"{retrieval_system_path}/dict_nb_name_and_cleaned_nb_name.json", mode="r") as f:
+            load_json=f.read()
+            self.dict_nb_name_and_cleaned_nb_name=json.loads(load_json)
+        with open(f"{retrieval_system_path}/dict_nb_name_and_cleaned_nb_name2.json", mode="r") as f:
+            load_json=f.read()
+            self.dict_nb_name_and_cleaned_nb_name2=json.loads(load_json)
+        with open(f"{retrieval_system_path}/dict_nb_name_dir.json", mode="r") as f:
+            load_json=f.read()
+            self.dict_nb_name_dir=json.loads(load_json)
+    
