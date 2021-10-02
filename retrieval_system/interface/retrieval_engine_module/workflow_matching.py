@@ -105,7 +105,7 @@ class WorkflowMatching:
         self.valid_nb_name_file_path=valid_nb_name_file_path
         self.change_next_node_thres=change_next_node_thres
         self.calc_time_sum=0
-        self.top_k_score=1001001
+        self.top_k_score=[]
         self.flg_running_faster={}
         self.class_code_relatedness=CodeRelatedness()
         self.invalid_by_workflow_structure={"invalid":set(), "valid":set()}
@@ -1475,6 +1475,14 @@ class WorkflowMatching:
         self.db_workflow_info[nb_name]["Display_data"][display_type]+=1
         
     def get_db_workflow_info(self):
+
+        self.attr_of_db_node_type=nx.get_node_attributes(self.G, "node_type")
+        self.attr_of_db_nb_name=nx.get_node_attributes(self.G, "nb_name")
+        self.attr_of_db_real_cell_id=nx.get_node_attributes(self.G, "real_cell_id")
+        self.attr_of_db_display_type=nx.get_node_attributes(self.G, "display_type")
+        self.set_all_label_node_list()
+        self.set_nb_node_list()
+        
         self.db_workflow_info={}
         node_db_list=self.G.nodes # list[str]
         for node in node_db_list:
@@ -6013,6 +6021,8 @@ class WorkflowMatching:
     """人工データセット適用"""
     def load_artifical_dataset(self, dataset_size, change_id_list_path, change_libraries_list_path, retrieval_system_path):
         """人工データセット読み込み"""
+        if dataset_size==1:
+            return 0
         self.flg_use_artifical_dataset=True
         self.load_libraries_of_artifical_dataset(dataset_size, change_libraries_list_path)
         self.load_dict_nb_name_and_cleaned_nb_name(retrieval_system_path)
@@ -6022,8 +6032,7 @@ class WorkflowMatching:
         change_id_list=read_lines.split("\n")
 
         all_nodes_list = list(self.G.nodes())
-        valid_nb_name2=[]
-        valid_nb_name2_append=valid_nb_name2.append
+        valid_nb_name_append=self.valid_nb_name.append
         cell_num=0
         for n in all_nodes_list:
             if "cell" in n:
@@ -6038,7 +6047,7 @@ class WorkflowMatching:
                 new_cleaned_nb_name=f"{cleaned_nb_name}cp{copy_id}"
                 v=self.dict_nb_name_and_cleaned_nb_name[cleaned_nb_name]
                 new_nb_name = v[:v.rfind(".ipynb")] + f"_copy{copy_id}" + ".ipynb"
-                valid_nb_name2_append(new_cleaned_nb_name)
+                valid_nb_name_append(new_cleaned_nb_name)
                 if new_cleaned_nb_name not in self.dict_nb_name_and_cleaned_nb_name:
                     self.dict_nb_name_and_cleaned_nb_name[new_cleaned_nb_name] = new_nb_name
                 if new_nb_name not in self.dict_nb_name_and_cleaned_nb_name2:
@@ -6081,7 +6090,7 @@ class WorkflowMatching:
                     for e in self.G.edges():
                         if delete_node not in e:
                             continue
-                        if e[0] in node_correspondence_dict and e[1] in node_correspondence_dict:
+                        if e[0] not in node_correspondence_dict or e[1] not in node_correspondence_dict:
                             continue
                         self.G.add_edge(node_correspondence_dict[e[0]], node_correspondence_dict[e[1]])
                 elif op == "add":
@@ -6110,7 +6119,7 @@ class WorkflowMatching:
                             else:
                                 logging.error(f"err: ノードのタイプがいずれにも一致していない．node_name:{n}, nb_name:{cleaned_nb_name}") # -> 新しく追加したものがここに入っている?
                     for e in self.G.edges():
-                        if e[0] in node_correspondence_dict and e[1] in node_correspondence_dict:
+                        if e[0] not in node_correspondence_dict or e[1] not in node_correspondence_dict:
                             continue
                         self.G.add_edge(node_correspondence_dict[e[0]], node_correspondence_dict[e[1]])
                     self.G.add_edge(node_correspondence_dict[selected_node], node_correspondence_dict[add_node])
@@ -6139,10 +6148,9 @@ class WorkflowMatching:
                             else:
                                 logging.error(f"err: ノードのタイプがいずれにも一致していない．node_name:{n}, nb_name:{cleaned_nb_name}") # -> 新しく追加したものがここに入っている?
                     for e in self.G.edges():
-                        if e[0] in node_correspondence_dict and e[1] in node_correspondence_dict:
+                        if e[0] not in node_correspondence_dict or e[1] not in node_correspondence_dict:
                             continue
                         self.G.add_edge(node_correspondence_dict[e[0]], node_correspondence_dict[e[1]])
-        self.valid_nb_name=self.valid_nb_name+valid_nb_name2
 
         self.attr_of_db_node_type=nx.get_node_attributes(self.G, "node_type")
         self.attr_of_db_nb_name=nx.get_node_attributes(self.G, "nb_name")
@@ -6150,6 +6158,7 @@ class WorkflowMatching:
         self.attr_of_db_display_type=nx.get_node_attributes(self.G, "display_type")
         self.set_all_label_node_list()
         self.set_nb_node_list()
+        return 1
 
 
     def load_libraries_of_artifical_dataset(self, dataset_size, change_libraries_list_path):
@@ -6159,9 +6168,50 @@ class WorkflowMatching:
         with open(change_libraries_list_path, mode="r") as f:
             load_contents=f.read()
         change_libraries_list=load_contents.split("\n")
+        #chk_str = f"cp{dataset_size-1}"
         for r in change_libraries_list:
             r_list=r.split(",\t")
-            self.library[r_list[0]]=r_list[1:]
+            if len(r_list) == 1:
+                self.library[r_list[0]]=[]
+            else:
+                self.library[r_list[0]]=r_list[1:]
+
+        """
+        if dataset_size<=10:
+            for r in change_libraries_list:
+                r_list=r.split(",\t")
+                name = r_list[0]
+                if name[-3:] == chk_str:
+                    break
+                self.library[name]=r_list[1:]
+        elif dataset_size<=100:
+            for r in change_libraries_list:
+                r_list=r.split(",\t")
+                name = r_list[0]
+                if name[-4:] == chk_str:
+                    break
+                self.library[name]=r_list[1:]
+        elif dataset_size<=1000:
+            for r in change_libraries_list:
+                r_list=r.split(",\t")
+                name = r_list[0]
+                if name[-5:] == chk_str:
+                    break
+                self.library[name]=r_list[1:]
+        """
+        """
+        for r in change_libraries_list:
+            r_list=r.split(",\t")
+            name = r_list[0]
+            if dataset_size<10 and name[-3:] == chk_str:
+                break
+            elif dataset_size<100 and name[-4:] == chk_str:
+                break
+            elif dataset_size<1000 and name[-5:] == chk_str:
+                break
+            self.library[name]=r_list[1:]
+        """
+
 
 
     def is_artifical_dataset(self, cleaned_nb_name):
