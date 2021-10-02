@@ -1274,97 +1274,6 @@ class WorkflowMatching:
             nb_name_list.add(nb_name)
         return nb_name_list
 
-    # set_db_graphで使用
-    def add_node_to_graph(self, node):
-        """
-        add node to DiGraph 'self.G'
-
-        Args:
-            node (Node): py2neo instance.
-        """
-        err=False
-        if node.has_label("Var"):
-            nb_name=node["name"]
-            nb_name=nb_name[nb_name.rfind("_")+1:]
-            if nb_name not in self.valid_nb_name:
-                return True
-            #self.G.add_node(node["name"], node_type="Var", nb_name=nb_name, data_type=node["data_type"])
-            self.G.add_node(node["name"], node_type="Var", nb_name=nb_name)
-        elif node.has_label("Cell"):
-            if node["nb_name"] not in self.valid_nb_name:
-                return True
-            self.G.add_node(node["name"], node_type="Cell", nb_name=node["nb_name"], real_cell_id=node["real_cell_id"])
-        elif node.has_label("Display_data"):
-            if node["nb_name"] not in self.valid_nb_name:
-                return True
-            #self.G.add_node(node["name"], node_type="Display_data", nb_name=node["nb_name"], display_type=node["data_type"], cell_id=node["real_cell_id"])
-            self.G.add_node(node["name"], node_type="Display_data", nb_name=node["nb_name"], display_type=node["data_type"])
-        return err
-    
-    # 使用
-    def add_node_to_graph_to_knn_graph(self, node):
-        """
-        add node to DiGraph 'self.KnnGraph'
-
-        Args:
-            node (Node): py2neo instance.
-        """
-        err=False
-        if node.has_label("Var"):
-            nb_name=node["name"]
-            nb_name=nb_name[nb_name.rfind("_")+1:]
-            if nb_name not in self.valid_nb_name:
-                return True
-            self.KnnGraph.add_node(node["name"], node_type="Var", nb_name=nb_name, data_type=node["data_type"])
-        elif node.has_label("Cell"):
-            if node["nb_name"] not in self.valid_nb_name:
-                return True
-            self.KnnGraph.add_node(node["name"], node_type="Cell", nb_name=node["nb_name"], real_cell_id=node["real_cell_id"])
-        elif node.has_label("Display_data"):
-            if node["nb_name"] not in self.valid_nb_name:
-                return True
-            self.KnnGraph.add_node(node["name"], node_type="Display_data", nb_name=node["nb_name"], display_type=node["data_type"], cell_id=node["real_cell_id"])
-        return err
-
-    def init_db_workflow_info(self, nb_name):
-        if nb_name not in self.db_workflow_info:
-            self.db_workflow_info[nb_name]={"Cell": 0, "Var": 0, "Display_data": {}, "max_indegree": 0, "max_outdegree": 0}
-
-    # set_db_graphで使用？
-    def add_node_to_graph_and_set_workflow_info(self, node):
-        """
-        add node to DiGraph 'self.G'
-
-        Args:
-            node (Node): py2neo instance.
-        """
-        err=False
-        if node.has_label("Var"):
-            nb_name=node["name"]
-            nb_name=nb_name[nb_name.rfind("_")+1:]
-            if nb_name not in self.valid_nb_name:
-                return True
-            #self.G.add_node(node["name"], node_type="Var", nb_name=nb_name, data_type=node["data_type"])
-            self.G.add_node(node["name"], node_type="Var", nb_name=nb_name)
-            self.init_db_workflow_info(nb_name)
-            self.db_workflow_info[nb_name]["Var"]+=1
-        elif node.has_label("Cell"):
-            if node["nb_name"] not in self.valid_nb_name:
-                return True
-            self.G.add_node(node["name"], node_type="Cell", nb_name=node["nb_name"], real_cell_id=node["real_cell_id"])
-            self.init_db_workflow_info(nb_name)
-            self.db_workflow_info[nb_name]["Cell"]+=1
-        elif node.has_label("Display_data"):
-            if node["nb_name"] not in self.valid_nb_name:
-                return True
-            #self.G.add_node(node["name"], node_type="Display_data", nb_name=node["nb_name"], display_type=node["data_type"], cell_id=node["cell_id"])
-            self.G.add_node(node["name"], node_type="Display_data", nb_name=node["nb_name"], display_type=node["data_type"])
-            self.init_db_workflow_info(nb_name)
-            if node in self.attr_of_q_display_type:
-                display_type = self.attr_of_q_display_type[node]
-                self.countup_display_data(nb_name, display_type)
-        return err
-
     # グラフをデータベースから読み込むために使用
     def set_db_graph(self):
         self.set_valid_nb_name()
@@ -1374,24 +1283,36 @@ class WorkflowMatching:
         r_matcher = RelationshipMatcher(self.graph_db) #matcherの初期化
 
         node_list = matcher.match().all()
-        for start_node in node_list: #全てのノードをnetworkxのDiGraphに追加
-            err=self.add_node_to_graph(start_node)
-            #err=self.add_node_to_graph_and_set_workflow_info(start_node)
-            if err:
-                continue
+        G_add_node=self.G.add_node
+        for node in node_list: #全てのノードをnetworkxのDiGraphに追加
+            if node.has_label("Var"):
+                nb_name=node["name"]
+                nb_name=nb_name[nb_name.rfind("_")+1:]
+                if nb_name not in self.valid_nb_name:
+                    return True
+                #self.G.add_node(node["name"], node_type="Var", nb_name=nb_name, data_type=node["data_type"])
+                G_add_node(node["name"], node_type="Var", nb_name=nb_name)
+            elif node.has_label("Cell"):
+                if node["nb_name"] not in self.valid_nb_name:
+                    return True
+                G_add_node(node["name"], node_type="Cell", nb_name=node["nb_name"], real_cell_id=node["real_cell_id"])
+            elif node.has_label("Display_data"):
+                if node["nb_name"] not in self.valid_nb_name:
+                    return True
+                #self.G.add_node(node["name"], node_type="Display_data", nb_name=node["nb_name"], display_type=node["data_type"], cell_id=node["real_cell_id"])
+                G_add_node(node["name"], node_type="Display_data", nb_name=node["nb_name"], display_type=node["data_type"])
 
+        G_has_node=self.G.has_node
+        G_add_edge=self.G.add_edge
         for start_node in node_list:
-            if not self.G.has_node(start_node["name"]):
+            if not G_has_node(start_node["name"]):
                 continue
             rel_list = r_matcher.match((start_node, ), "Successor").all() + r_matcher.match((start_node, ), "Contains").all() + r_matcher.match((start_node, ), "Usedby").all() + r_matcher.match((start_node, ), "Display").all()
             for rel in rel_list:
                 end_node=rel.end_node
-                if not self.G.has_node(end_node["name"]):
+                if not G_has_node(end_node["name"]):
                     continue
-                #    err=self.add_node_to_graph(end_node)
-                #    if err:
-                #        continue
-                self.G.add_edge(start_node["name"], end_node["name"])
+                G_add_edge(start_node["name"], end_node["name"])
 
         self.attr_of_db_node_type=nx.get_node_attributes(self.G, "node_type")
         self.attr_of_db_nb_name=nx.get_node_attributes(self.G, "nb_name")
@@ -6031,12 +5952,15 @@ class WorkflowMatching:
             read_lines=f.read()
         change_id_list=read_lines.split("\n")
 
-        all_nodes_list = list(self.G.nodes())
+        all_nodes_list = list(self.attr_of_db_nb_name.keys())
+        all_edges_list = list(self.G.edges())
         valid_nb_name_append=self.valid_nb_name.append
         cell_num=0
         for n in all_nodes_list:
             if "cell" in n:
                 cell_num = max(int(n[n.rfind("_")+1:]), cell_num)
+        G_add_node=self.G.add_node
+        G_add_edge=self.G.add_edge
         for copy_id in range(dataset_size-1):
             for cleaned_nb_name in self.valid_nb_name:
                 node_correspondence_dict={}
@@ -6065,8 +5989,6 @@ class WorkflowMatching:
                     delete_node = id_and_operation[3]
                     # 与えられたノートブック名の nodeを全て複製
                     for n in all_nodes_list:
-                        if n not in self.attr_of_db_nb_name:
-                            continue
                         if self.attr_of_db_nb_name[n] == cleaned_nb_name:
                             if n == delete_node:
                                 continue
@@ -6074,83 +5996,79 @@ class WorkflowMatching:
                                 cell_num+=1
                                 node_name = f"cell_{cell_num}"
                                 real_cell_id=self.attr_of_db_real_cell_id[n]
-                                self.G.add_node(node_name, node_type="Cell", nb_name=new_cleaned_nb_name, real_cell_id=real_cell_id)
+                                G_add_node(node_name, node_type="Cell", nb_name=new_cleaned_nb_name, real_cell_id=real_cell_id)
                                 node_correspondence_dict[n]=node_name
                             elif self.attr_of_db_node_type[n] == "Var":
                                 node_name=f"{n}cp{copy_id}"
-                                self.G.add_node(node_name, node_type="Var", nb_name=new_cleaned_nb_name)
+                                G_add_node(node_name, node_type="Var", nb_name=new_cleaned_nb_name)
                                 node_correspondence_dict[n]=node_name
                             elif self.attr_of_db_node_type[n] == "Display_data":
                                 node_name=f"{n}cp{copy_id}"
                                 display_type=self.attr_of_db_display_type[n]
-                                self.G.add_node(node_name, node_type="Display_data", nb_name=new_cleaned_nb_name, display_type=display_type)
+                                G_add_node(node_name, node_type="Display_data", nb_name=new_cleaned_nb_name, display_type=display_type)
                                 node_correspondence_dict[n]=node_name
                             else:
                                 logging.error(f"err: ノードのタイプがいずれにも一致していない．node_name:{n}, nb_name:{cleaned_nb_name}") # -> 新しく追加したものがここに入っている?
-                    for e in self.G.edges():
+                    for e in all_edges_list:
                         if delete_node not in e:
                             continue
                         if e[0] not in node_correspondence_dict or e[1] not in node_correspondence_dict:
                             continue
-                        self.G.add_edge(node_correspondence_dict[e[0]], node_correspondence_dict[e[1]])
+                        G_add_edge(node_correspondence_dict[e[0]], node_correspondence_dict[e[1]])
                 elif op == "add":
                     selected_node = id_and_operation[3]
                     add_node = id_and_operation[4]
                     # 与えられたノートブック名の nodeを全て複製
                     for n in all_nodes_list:
-                        if n not in self.attr_of_db_nb_name:
-                            continue
                         if self.attr_of_db_nb_name[n] == cleaned_nb_name or n == add_node:
                             if self.attr_of_db_node_type[n] == "Cell":
                                 cell_num+=1
                                 node_name = f"cell_{cell_num}"
                                 real_cell_id=self.attr_of_db_real_cell_id[n]
-                                self.G.add_node(node_name, node_type="Cell", nb_name=new_cleaned_nb_name, real_cell_id=real_cell_id)
+                                G_add_node(node_name, node_type="Cell", nb_name=new_cleaned_nb_name, real_cell_id=real_cell_id)
                                 node_correspondence_dict[n]=node_name
                             elif self.attr_of_db_node_type[n] == "Var":
                                 node_name=f"{n}cp{copy_id}"
-                                self.G.add_node(node_name, node_type="Var", nb_name=new_cleaned_nb_name)
+                                G_add_node(node_name, node_type="Var", nb_name=new_cleaned_nb_name)
                                 node_correspondence_dict[n]=node_name
                             elif self.attr_of_db_node_type[n] == "Display_data":
                                 node_name=f"{n}cp{copy_id}"
                                 display_type=self.attr_of_db_display_type[n]
-                                self.G.add_node(node_name, node_type="Display_data", nb_name=new_cleaned_nb_name, display_type=display_type)
+                                G_add_node(node_name, node_type="Display_data", nb_name=new_cleaned_nb_name, display_type=display_type)
                                 node_correspondence_dict[n]=node_name
                             else:
                                 logging.error(f"err: ノードのタイプがいずれにも一致していない．node_name:{n}, nb_name:{cleaned_nb_name}") # -> 新しく追加したものがここに入っている?
-                    for e in self.G.edges():
+                    for e in all_edges_list:
                         if e[0] not in node_correspondence_dict or e[1] not in node_correspondence_dict:
                             continue
-                        self.G.add_edge(node_correspondence_dict[e[0]], node_correspondence_dict[e[1]])
-                    self.G.add_edge(node_correspondence_dict[selected_node], node_correspondence_dict[add_node])
+                        G_add_edge(node_correspondence_dict[e[0]], node_correspondence_dict[e[1]])
+                    G_add_edge(node_correspondence_dict[selected_node], node_correspondence_dict[add_node])
 
                 else: #何も操作しない場合
                     # 与えられたノートブック名の nodeを全て複製
                     for n in all_nodes_list:
-                        if n not in self.attr_of_db_nb_name:
-                            continue
                         if self.attr_of_db_nb_name[n] == cleaned_nb_name:
                             if self.attr_of_db_node_type[n] == "Cell":
                                 cell_num+=1
                                 node_name = f"cell_{cell_num}"
                                 real_cell_id=self.attr_of_db_real_cell_id[n]
-                                self.G.add_node(node_name, node_type="Cell", nb_name=new_cleaned_nb_name, real_cell_id=real_cell_id)
+                                G_add_node(node_name, node_type="Cell", nb_name=new_cleaned_nb_name, real_cell_id=real_cell_id)
                                 node_correspondence_dict[n]=node_name
                             elif self.attr_of_db_node_type[n] == "Var":
                                 node_name=f"{n}cp{copy_id}"
-                                self.G.add_node(node_name, node_type="Var", nb_name=new_cleaned_nb_name)
+                                G_add_node(node_name, node_type="Var", nb_name=new_cleaned_nb_name)
                                 node_correspondence_dict[n]=node_name
                             elif self.attr_of_db_node_type[n] == "Display_data":
                                 node_name=f"{n}cp{copy_id}"
                                 display_type=self.attr_of_db_display_type[n]
-                                self.G.add_node(node_name, node_type="Display_data", nb_name=new_cleaned_nb_name, display_type=display_type)
+                                G_add_node(node_name, node_type="Display_data", nb_name=new_cleaned_nb_name, display_type=display_type)
                                 node_correspondence_dict[n]=node_name
                             else:
                                 logging.error(f"err: ノードのタイプがいずれにも一致していない．node_name:{n}, nb_name:{cleaned_nb_name}") # -> 新しく追加したものがここに入っている?
-                    for e in self.G.edges():
+                    for e in all_edges_list:
                         if e[0] not in node_correspondence_dict or e[1] not in node_correspondence_dict:
                             continue
-                        self.G.add_edge(node_correspondence_dict[e[0]], node_correspondence_dict[e[1]])
+                        G_add_edge(node_correspondence_dict[e[0]], node_correspondence_dict[e[1]])
 
         self.attr_of_db_node_type=nx.get_node_attributes(self.G, "node_type")
         self.attr_of_db_nb_name=nx.get_node_attributes(self.G, "nb_name")
