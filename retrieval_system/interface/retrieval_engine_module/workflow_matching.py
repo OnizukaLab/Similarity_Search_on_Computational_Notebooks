@@ -1275,7 +1275,7 @@ class WorkflowMatching:
         return nb_name_list
 
     # set_db_graphで使用
-    def add_node_to_graph(self, node) -> boolean:
+    def add_node_to_graph(self, node) -> bool:
         """
         add node to DiGraph 'self.G'
 
