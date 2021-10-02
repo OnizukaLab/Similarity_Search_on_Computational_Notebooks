@@ -1274,6 +1274,37 @@ class WorkflowMatching:
             nb_name_list.add(nb_name)
         return nb_name_list
 
+    # set_db_graphで使用
+    def add_node_to_graph(self, node) -> boolean:
+        """
+        add node to DiGraph 'self.G'
+
+        Args:
+            node (Node): py2neo instance.
+        """
+        err=False
+        if node.has_label("Var"):
+            nb_name=node["name"]
+            nb_name=nb_name[nb_name.rfind("_")+1:]
+            if nb_name not in self.valid_nb_name:
+                return True
+            #self.G.add_node(node["name"], node_type="Var", nb_name=nb_name, data_type=node["data_type"])
+            self.G.add_node(node["name"], node_type="Var", nb_name=nb_name)
+        elif node.has_label("Cell"):
+            if node["nb_name"] not in self.valid_nb_name:
+                return True
+            self.G.add_node(node["name"], node_type="Cell", nb_name=node["nb_name"], real_cell_id=node["real_cell_id"])
+        elif node.has_label("Display_data"):
+            if node["nb_name"] not in self.valid_nb_name:
+                return True
+            #self.G.add_node(node["name"], node_type="Display_data", nb_name=node["nb_name"], display_type=node["data_type"], cell_id=node["real_cell_id"])
+            self.G.add_node(node["name"], node_type="Display_data", nb_name=node["nb_name"], display_type=node["data_type"])
+        return err
+    
+    def init_db_workflow_info(self, nb_name):
+        if nb_name not in self.db_workflow_info:
+            self.db_workflow_info[nb_name]={"Cell": 0, "Var": 0, "Display_data": {}, "max_indegree": 0, "max_outdegree": 0}
+
     # グラフをデータベースから読み込むために使用
     def set_db_graph(self):
         self.set_valid_nb_name()
@@ -1283,25 +1314,11 @@ class WorkflowMatching:
         r_matcher = RelationshipMatcher(self.graph_db) #matcherの初期化
 
         node_list = matcher.match().all()
-        G_add_node=self.G.add_node
-        for node in node_list: #全てのノードをnetworkxのDiGraphに追加
-            if node.has_label("Var"):
-                nb_name=node["name"]
-                nb_name=nb_name[nb_name.rfind("_")+1:]
-                if nb_name not in self.valid_nb_name:
-                    return True
-                #self.G.add_node(node["name"], node_type="Var", nb_name=nb_name, data_type=node["data_type"])
-                G_add_node(node["name"], node_type="Var", nb_name=nb_name)
-            elif node.has_label("Cell"):
-                if node["nb_name"] not in self.valid_nb_name:
-                    return True
-                G_add_node(node["name"], node_type="Cell", nb_name=node["nb_name"], real_cell_id=node["real_cell_id"])
-            elif node.has_label("Display_data"):
-                if node["nb_name"] not in self.valid_nb_name:
-                    return True
-                #self.G.add_node(node["name"], node_type="Display_data", nb_name=node["nb_name"], display_type=node["data_type"], cell_id=node["real_cell_id"])
-                G_add_node(node["name"], node_type="Display_data", nb_name=node["nb_name"], display_type=node["data_type"])
-
+        for start_node in node_list: #全てのノードをnetworkxのDiGraphに追加
+            err=self.add_node_to_graph(start_node)
+            #err=self.add_node_to_graph_and_set_workflow_info(start_node)
+            if err:
+                continue
         G_has_node=self.G.has_node
         G_add_edge=self.G.add_edge
         for start_node in node_list:
@@ -1312,6 +1329,9 @@ class WorkflowMatching:
                 end_node=rel.end_node
                 if not G_has_node(end_node["name"]):
                     continue
+                #    err=self.add_node_to_graph(end_node)
+                #    if err:
+                #        continue
                 G_add_edge(start_node["name"], end_node["name"])
 
         self.attr_of_db_node_type=nx.get_node_attributes(self.G, "node_type")
