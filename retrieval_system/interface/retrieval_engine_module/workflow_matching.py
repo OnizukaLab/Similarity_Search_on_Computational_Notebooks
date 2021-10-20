@@ -3924,7 +3924,7 @@ class WorkflowMatching:
         if self.flg_juneau:
             return  0.0
         #group idはnb_nameで代用できる(つながっているワークフローごとに一意なので)
-        logging.info("calc table sim...")
+        #logging.info("calc table sim...")
 
         rel_score=0.0
         matching=[]
@@ -4010,7 +4010,7 @@ class WorkflowMatching:
         if self.flg_juneau:
             return 0.0
         #group idはnb_nameで代用できる(つながっているワークフローごとに一意なので)
-        logging.info("calc table sim...")
+        #logging.info("calc table sim...")
         rel_score=0.0
         matching=[]
         acol_set_A = {} # dict{str: list[any]}: {列名: 列名に対応する列のデータ値のうち,Null値を除いたデータ値の重複無しリスト.}
