@@ -16,7 +16,6 @@
 Module to store a table's provenance.
 """
 
-import base64
 import logging
 import json
 import pandas as pd
@@ -32,7 +31,7 @@ import timeout_decorator
 import matplotlib.pyplot as plt
 import copy
 import random
-from typing import Union, List # annotations
+from typing import Tuple, Union, List # annotations
 
 from py2neo import Node, Relationship, NodeMatcher, RelationshipMatcher
 from juneau.config import config
@@ -62,7 +61,7 @@ class WorkflowMatching:
     
     graph_db (Graph): py2neoのクラス`Graph`のインスタンス
     """
-    def __init__(self, postgres_eng, graph_eng, sim_col_thres=0.5, w_c=1, w_v=1, w_l=1, w_d=1, k=6, change_next_node_thres=0.8, valid_nb_name_file_path="../データセット/valid_nb_name.txt", flg_juneau=False):#, thres_data_profile=0.9):
+    def __init__(self, postgres_eng, graph_eng, sim_col_thres:float=0.5, w_c:float=1, w_v:float=1, w_l:float=1, w_d:float=1, k:int=6, change_next_node_thres:float=0.8, valid_nb_name_file_path:str="../データセット/valid_nb_name.txt", flg_juneau:bool=False):#, thres_data_profile=0.9):
         """
         PostgreSQLのインスタンスとpy2neoのインスタンスをインスタンスにセットする．
 
@@ -129,25 +128,32 @@ class WorkflowMatching:
 
 
     def init_each_calc_time_sum(self):
+        """Initialize self.each_calc_time_sum"""
         self.each_calc_time_sum={"Cell":0.0, "Var":0.0, "Display_data":0.0, "Library":0.0}
 
-    def set_each_w(self, w_c=None, w_v=None, w_l=None, w_d=None):
+    def set_each_w(self, w_c:float=None, w_v:float=None, w_l:float=None, w_d:float=None):
+        """Set each weight."""
         if not w_c is None:
-            logging.info(f"reset code sim weight {self.w_c} --> {w_c}")
+            logging.info(f"Set code sim weight = {w_c}")
             self.w_c=w_c
         if not w_v is None:
-            logging.info(f"reset table data sim weight {self.w_v} --> {w_v}")
+            logging.info(f"Set data sim weight = {w_v}")
             self.w_v=w_v
         if not w_l is None:
-            logging.info(f"reset library sim weight {self.w_l} --> {w_l}")
+            logging.info(f"Set library sim weight = {w_l}")
             self.w_l=w_l
         if not w_d is None:
-            logging.info(f"reset display output sim weight {self.w_d} --> {w_d}")
+            logging.info(f"Set output sim weight = {w_d}")
             self.w_d=w_d
 
-    def set_k(self,k):
-        self.k=k
+    def set_k(self,k:int):
+        """
+        Set a natural number k for top-k search on computational notebooks.
 
+        Args:
+            k (int): a natural number for top-k search on computational notebooks.
+        """
+        self.k=k
 
     def set_query_attr(self):
         self.attr_of_q_node_type = nx.get_node_attributes(self.QueryGraph, "node_type")
@@ -155,13 +161,17 @@ class WorkflowMatching:
         self.attr_of_q_display_type=nx.get_node_attributes(self.QueryGraph, "display_type")
         self.set_query_workflow_info_Display_data()
 
-
-    def set_sim_col_thres(self, sim_col_thres):
+    def set_sim_col_thres(self, sim_col_thres:float):
         self.sim_col_thres=sim_col_thres
     
     # 読み込み
     # クエリでは不使用　実装の際の便宜用
-    def load_calculated_sim(self, calculated_sim_path):
+    def load_calculated_sim(self, calculated_sim_path:str):
+        """
+        For development.
+        開発用．
+        calculated_sim_pathで指定するパスからJSON形式の計算済み類似度を取得しself.calculated_simに格納．
+        """
         with open(calculated_sim_path, mode="r") as f:
             load_json=f.read()
 
@@ -173,7 +183,13 @@ class WorkflowMatching:
 
     # 書き込み
     # クエリでは不使用　実装の際の便宜用
-    def store_calculated_sim(self, calculated_sim_path):
+    def store_calculated_sim(self, calculated_sim_path:str):
+        """
+        For development.
+        開発用．
+        変数self.calculated_simに格納される計算済み類似度をJSON形式に変換し，
+        calculated_sim_pathで指定するパスに格納．
+        """
         store_json=[]
         for key, val in self.calculated_sim.items():
             store_json.append([key[0], key[1], val])
@@ -184,6 +200,7 @@ class WorkflowMatching:
     
     def fetch_db_node(self):
         """
+        For development.
         Neo4Jに格納されている全てのノードを取り出す．
         """
         matcher = NodeMatcher(self.graph_db) #matcherの初期化
@@ -231,21 +248,10 @@ class WorkflowMatching:
         logging.info(f"root_count: {root_count}, nb_name count: {len(self.nb_node_dict)}")
         print(self.root_list2)
 
-    def add_code_node(self, source_code):
-        cell_id=len(self.query_cell_code)+1
-        #ノード追加
-        self.QueryGraph.add_node(f"cell_query_{cell_id}", node_type="Cell", real_cell_id=f"{cell_id}")
-        #エッジ追加
-        if cell_id > 1:
-            self.QueryGraph.add_edge(f"cell_query_{cell_id-1}", f"cell_query_{cell_id}")
-        #実際のソースコードを保持
-        self.query_cell_code[f"cell_query_{cell_id}"]=source_code
-
-
-
     #実際のNBの一部 
     # 実行時間の測定に利用
     def make_query_for_user_exp(self, workflow_type, cleaned_nb_name, cell_id_list, var_name_list, display_type_list, data_size=1):
+        """For experiments."""
         if workflow_type==1:
             self.QueryGraph, self.query_root, cell_count, var_count, display_count_dict, max_indegree, max_outdegree=self.make_query_base_graph_1(display_type_list)
             logging.info(f"using function :make_query_base_graph_1")
@@ -289,6 +295,7 @@ class WorkflowMatching:
 
 
     def make_query_base_graph_1(self, display_type_list):
+        """For experiments."""
         base_QueryGraph=nx.DiGraph()
         for i in range(1,5):
             base_QueryGraph.add_node(f"cell_query_{i}", node_type="Cell", real_cell_id=f"{i}")
@@ -316,6 +323,7 @@ class WorkflowMatching:
         return base_QueryGraph, query_root, cell_count, var_count, display_count_dict, max_indegree, max_outdegree
 
     def make_query_base_graph_2(self, display_type_list):
+        """For experiments."""
         base_QueryGraph=nx.DiGraph()
         for i in range(1,5):
             base_QueryGraph.add_node(f"cell_query_{i}", node_type="Cell", real_cell_id=f"{i}")
@@ -343,6 +351,7 @@ class WorkflowMatching:
         return base_QueryGraph, query_root, cell_count, var_count, display_count_dict, max_indegree, max_outdegree
 
     def make_query_base_graph_3(self, display_type_list):
+        """For experiments."""
         base_QueryGraph=nx.DiGraph()
         for i in range(1,5):
             base_QueryGraph.add_node(f"cell_query_{i}", node_type="Cell", real_cell_id=f"{i}")
@@ -370,6 +379,7 @@ class WorkflowMatching:
         return base_QueryGraph, query_root, cell_count, var_count, display_count_dict, max_indegree, max_outdegree
 
     def make_query_base_graph_cell_only_1(self):
+        """For experiments."""
         base_QueryGraph=nx.DiGraph()
         for i in range(1,5):
             base_QueryGraph.add_node(f"cell_query_{i}", node_type="Cell", real_cell_id=f"{i}")
@@ -385,8 +395,8 @@ class WorkflowMatching:
         return base_QueryGraph, query_root, cell_count, var_count, display_count_dict, max_indegree, max_outdegree
 
 
-
     def make_sample_query(self, query_nb_name):
+        """For experiments."""
         cid=1
         data_id=1
         filepath="../../データセット/query_sample/"+query_nb_name
@@ -440,6 +450,7 @@ class WorkflowMatching:
                     cid+=1
     
     def make_sample_query_nx1_2_old(self):
+        """For experiments."""
         self.QueryGraph=nx.DiGraph()
 
         # 頂点のセット
@@ -478,6 +489,7 @@ class WorkflowMatching:
         self.query_workflow_info={"Cell": 3, "Var": 1, "Display_data": {}, "max_indegree": 1, "max_outdegree": 2}
 
     def make_sample_query_nx1_2(self):
+        """For experiments."""
         self.QueryGraph=nx.DiGraph()
 
         # 頂点のセット
@@ -519,6 +531,7 @@ class WorkflowMatching:
 
     #実際のNBの一部
     def make_sample_query_nx1_3_old(self):
+        """For experiments."""
         self.QueryGraph=nx.DiGraph()
 
         # 頂点のセット
@@ -566,6 +579,7 @@ class WorkflowMatching:
     
     #実際のNBの一部 
     def make_sample_query_nx1_3(self):
+        """For experiments."""
         self.QueryGraph=nx.DiGraph()
 
         # 頂点のセット
@@ -614,6 +628,7 @@ class WorkflowMatching:
 
     #実際のNBの一部 
     def make_sample_query_nx1_4(self):
+        """For experiments."""
         self.QueryGraph=nx.DiGraph()
 
         # 頂点のセット
@@ -659,6 +674,7 @@ class WorkflowMatching:
 
 
     def make_sample_query_nx2_1(self):
+        """For experiments."""
         self.QueryGraph=nx.DiGraph()
 
         for i in range(1,4):
@@ -691,6 +707,7 @@ class WorkflowMatching:
 
     #実際のNBの一部
     def make_sample_query_nx2_2(self):
+        """For experiments."""
         self.QueryGraph=nx.DiGraph()
 
         for i in range(1,5):
@@ -731,6 +748,7 @@ class WorkflowMatching:
 
     #実際のNBの一部
     def make_sample_query_nx2_3_old(self):
+        """For experiments."""
         self.QueryGraph=nx.DiGraph()
 
         for i in range(1,5):
@@ -773,6 +791,7 @@ class WorkflowMatching:
     #実際のNBの一部
     # ユーザ実験に利用
     def make_sample_query_nx2_3(self):
+        """For experiments."""
         self.QueryGraph=nx.DiGraph()
 
         for i in range(1,5):
@@ -816,6 +835,7 @@ class WorkflowMatching:
     #実際のNBの一部
     # ユーザ実験に利用
     def make_sample_query_nx2_3_with_wildcard(self):
+        """For experiments."""
         self.QueryGraph=nx.DiGraph()
 
         for i in range(1,5):
@@ -862,6 +882,7 @@ class WorkflowMatching:
 
     #実際のNBの一部
     def make_sample_query_nx2_3_another1(self): #論文用
+        """For experiments."""
         # DataSet19, did-you-said-basics-eda-ml-for-very-beginners.ipynb
         self.QueryGraph=nx.DiGraph()
 
@@ -904,6 +925,7 @@ class WorkflowMatching:
     #実際のNBの一部
     # ユーザ実験に利用
     def make_sample_query_nx2_3_another2(self): #論文用
+        """For experiments."""
         # DataSet16, mobile-phone-pricing-predictions.ipynb
         self.QueryGraph=nx.DiGraph()
 
@@ -943,6 +965,7 @@ class WorkflowMatching:
 
     #実際のNBの一部
     def make_sample_query_nx2_3_another2_with_wildcard_1(self): #論文用
+        """For experiments."""
         # DataSet16, mobile-phone-pricing-predictions.ipynb
         self.QueryGraph=nx.DiGraph()
 
@@ -987,6 +1010,7 @@ class WorkflowMatching:
 
     #実際のNBの一部
     def make_sample_query_nx2_3_another2_with_wildcard_2(self): #論文用
+        """For experiments."""
         # DataSet16, mobile-phone-pricing-predictions.ipynb
         self.QueryGraph=nx.DiGraph()
 
@@ -1032,6 +1056,7 @@ class WorkflowMatching:
     #実際のNBの一部
     # ユーザ実験に利用
     def make_sample_query_nx2_3_another3(self): #論文用
+        """For experiments."""
         # DataSet19, video-games-industry-made-simple.ipynb
         self.QueryGraph=nx.DiGraph()
 
@@ -1078,6 +1103,7 @@ class WorkflowMatching:
     #実際のNBの一部
     # ユーザ実験に利用
     def make_sample_query_nx2_3_another3_with_wildcard(self): #論文用
+        """For experiments."""
         # DataSet19, video-games-industry-made-simple.ipynb
         self.QueryGraph=nx.DiGraph()
 
@@ -1163,7 +1189,7 @@ class WorkflowMatching:
         self.query_workflow_info["Display_data"]["all"]=sum_i
 
     #setDB-cleaned.ipynbで利用しているmymoduleからコピー
-    def __parse_code(self, code_list):
+    def __parse_code(self, code_list:str):
         test = FuncLister()
         all_code = ""
         line2cid = {}
@@ -1219,6 +1245,7 @@ class WorkflowMatching:
         return test.dependency, line2cid, all_code
 
     #setDB-cleaned.ipynbからコピー
+    #不使用
     def cleaning_one_cell_code(self,cellcode):
         flg1,flg2=0,0
         new_cellcode=[]
@@ -1277,7 +1304,7 @@ class WorkflowMatching:
     # set_db_graphで使用
     def add_node_to_graph(self, node) -> bool:
         """
-        add node to DiGraph 'self.G'
+        Add nodes to DiGraph 'self.G'
 
         Args:
             node (Node): py2neo instance.
@@ -1301,12 +1328,13 @@ class WorkflowMatching:
             self.G.add_node(node["name"], node_type="Display_data", nb_name=node["nb_name"], display_type=node["data_type"])
         return err
     
-    def init_db_workflow_info(self, nb_name):
+    def init_db_workflow_info(self, nb_name:str):
         if nb_name not in self.db_workflow_info:
             self.db_workflow_info[nb_name]={"Cell": 0, "Var": 0, "Display_data": {}, "max_indegree": 0, "max_outdegree": 0}
 
     # グラフをデータベースから読み込むために使用
     def set_db_graph(self):
+        """Neo4Jからグラフを読み込み，self.Gに格納する．"""
         self.set_valid_nb_name()
 
         self.G = nx.DiGraph()
@@ -1343,6 +1371,12 @@ class WorkflowMatching:
 
     # ベンチマーク用: すでに読み込んだグラフから読み込むために使用
     def set_db_graph2(self, graph):
+        """
+        キャッシュを読み込み，グラフをself.Gに格納する．
+        
+        Args:
+            graph: self.Gのキャッシュ．
+        """
         self.set_valid_nb_name()
 
         self.G = graph
@@ -1354,13 +1388,15 @@ class WorkflowMatching:
         self.set_nb_node_list()
     
     def set_nb_node_list(self):
+        """self.nb_node_listにCode, Data, Outputのラベルのノード数を，計算ノートブックごとに格納．"""
         for node in self.attr_of_db_nb_name:
             nb_name = self.attr_of_db_nb_name[node]
             node_type=self.attr_of_db_node_type[node]
             if nb_name not in self.nb_node_list:
                 self.nb_node_list[nb_name]={"Cell":[], "Var":[], "Display_data":[]}
             self.nb_node_list[nb_name][node_type].append(node)
-    
+
+    """
     def init_table_knn_sim_list(self, table_name):
         with self.psql_engine.connect() as conn:
             conn.execute(
@@ -1369,9 +1405,7 @@ class WorkflowMatching:
             )
 
     def store_knn_graph_via_sql(self, knn_k=5):
-        """
-        sqlでストアする場合
-        """
+        #sqlでストアする場合
         store_df = pd.DataFrame()
         if not self.all_node_list:
             self.set_all_label_node_list()
@@ -1400,17 +1434,17 @@ class WorkflowMatching:
                     )
             except Exception as e:
                 logging.error(f"Unable to store 'knn_sim_list' due to error {e}")
-                    
+    """                
         
     def set_all_label_node_list(self):
+        """self.all_node_listにCode, Data, Outputラベルごとにノードの数を格納．"""
         self.all_node_list={"Cell": [], "Var": [], "Display_data": []}
         node_list = self.attr_of_db_node_type
-        ret_node_list=[]
         for node in node_list:
             node_type=self.attr_of_db_node_type[node]
             self.all_node_list[node_type].append(node)
 
-    def countup_display_data(self, nb_name, display_type):
+    def countup_display_data(self, nb_name:str, display_type:str):
         if display_type not in self.db_workflow_info[nb_name]["Display_data"]:
             self.db_workflow_info[nb_name]["Display_data"][display_type]=0
         self.db_workflow_info[nb_name]["Display_data"][display_type]+=1
@@ -1675,6 +1709,10 @@ class WorkflowMatching:
 
     # データベースがうまく作れているノートブック名をセットするのに使用
     def set_valid_nb_name(self):
+        """
+        self.valid_nb_name_file_pathのパスからファイルを読み込み，
+        検索対象とする計算ノートブック名のリストをself.valid_nb_nameに格納する．
+        """
         with open(self.valid_nb_name_file_path, mode="r") as f:
             lines=f.readlines()
             for l in lines:
@@ -1695,11 +1733,12 @@ class WorkflowMatching:
             self.real_subgraph_matching_part_without_timecount(limit, nb_limit)
 
     # 使用予定：wildcardをクエリに含む
-    def subgraph_matching_with_wildcard_in_query(self, limit=None, nb_limit=None, tflg=False):
+    def subgraph_matching_with_wildcard_in_query(self, limit:int=None, nb_limit:int=None, tflg:bool=False):
         self.ans_list={}
         self.detected_count=0
         return self.real_subgraph_matching_part_A_with_wildcard_in_query(limit, nb_limit)
 
+    
     # 提案手法の交互実行で使用
     def subgraph_matching_weaving(self, limit=None, nb_limit=None, tflg=False, flg_knn=False):
         if tflg:
@@ -2164,7 +2203,7 @@ class WorkflowMatching:
         self.subgraph_matching_mode=subgraph_matching_mode
         logging.info(f"self.subgraph_matching_mode={subgraph_matching_mode}")
 
-    # 使用
+    # 不使用
     def real_subgraph_matching_part_weaving_with_timecount(self, limit=None, nb_limit=None, flg_knn=False):
         """
         先に関数set_db_graphでデータベースから読み込んでグラフをself.Gに格納している必要あり．
@@ -2809,7 +2848,10 @@ class WorkflowMatching:
         return current_score
 
 
-    def calc_rel_with_timecount(self, n1_name, n2_name):
+    def calc_rel_with_timecount(self, n1_name:str, n2_name:str) -> float:
+        """
+        Calculate the similarity between n1_name and n2_name and get how long the calculation needed.
+        """
         calc_start_time = timeit.default_timer()
         ret=self.calc_rel(n1_name, n2_name)
         calc_end_time = timeit.default_timer()
@@ -2915,7 +2957,7 @@ class WorkflowMatching:
             self.calculated_sim={}
         return ret
 
-    def calc_rel_o_with_timecount(self, n1_name, n2_name):
+    def calc_rel_o_with_timecount(self, n1_name:str, n2_name:str) -> float:
         calc_start_time = timeit.default_timer()
         ret=self.calc_rel_o(n1_name, n2_name)
         calc_end_time = timeit.default_timer()
@@ -2925,7 +2967,7 @@ class WorkflowMatching:
             self.calculated_sim={}
         return ret
 
-    def calc_rel_v_with_timecount(self, n1_name, n2_name):
+    def calc_rel_v_with_timecount(self, n1_name:str, n2_name:str) -> float:
         calc_start_time = timeit.default_timer()
         ret=self.calc_rel_v(n1_name, n2_name)
         calc_end_time = timeit.default_timer()
@@ -2935,7 +2977,16 @@ class WorkflowMatching:
             self.calculated_sim={}
         return ret
 
-    def calc_rel_c_with_timecount_2(self, n1_name, n2_name, remain_c_count):
+    def calc_rel_c_with_timecount_2(self, n1_name:str, n2_name:str, remain_c_count:int) -> Tuple[float, int]:
+        """
+        Args:
+            n1_name (str): A node name of the query graph.
+            n2_name (str): A node name of a workflow graph.
+            remain_c_count (int): The number of uncalculated code similarity. This number is used for calculating MaxSim in other functions.
+
+        Returns:
+            Tuple[float, int]: A tuple of a product of code similarity and the code weight, and the number of uncalculated code similarity.
+        """
         calc_start_time = timeit.default_timer()
         ret1, ret2=self.calc_rel_c_2(n1_name, n2_name, remain_c_count)
         calc_end_time = timeit.default_timer()
@@ -2963,7 +3014,22 @@ class WorkflowMatching:
         self.each_calc_time_sum[self.attr_of_db_node_type[n2_name]]+=calc_end_time-calc_start_time
         return ret
 
-    def calc_rel(self, n1_name, n2_name):
+    def calc_rel(self, n1_name:str, n2_name:str) -> float:
+        """
+        Return the product of the similarity and the weight.
+        n1_nameとn2_nameの類似度と重みの積を返す．
+        
+        Args:
+            n1_name (str): A node name of the query graph.
+            n2_name (str): A node name of a workflow graph.
+        
+        Returns:
+            float: 類似度と重みの積．
+
+        Example:
+            If w_D=2, the similarity between n1_name node and n2_name node is 0.6, it returns 1.2.
+
+        """
         class_code_relatedness=self.class_code_relatedness
         if self.attr_of_db_node_type[n2_name] == "Cell" and self.attr_of_q_node_type[n1_name] == "Cell": #type: cell
             if self.w_c==0:
@@ -3029,6 +3095,7 @@ class WorkflowMatching:
 
 
     def calc_rel_c_o(self, n1_name:str, n2_name:str) -> float:
+        """Call this function instead of 'calc_rel' when the data similarity weight is zero."""
         class_code_relatedness=self.class_code_relatedness
         if self.attr_of_db_node_type[n2_name] == "Cell" and self.attr_of_q_node_type[n1_name] == "Cell": #type: cell
             if self.w_c==0:
@@ -3067,7 +3134,15 @@ class WorkflowMatching:
             #logging.info(f"error: not match node type of workflow. {self.attr_of_q_node_type[n1_name]}, {self.attr_of_db_node_type[n2_name]}")
             return 0.0
 
-    def calc_rel_c_2(self, n1_name, n2_name, remain_c_count):
+    def calc_rel_c_2(self, n1_name:str, n2_name:str, remain_c_count:int):
+        """
+        Call this function instead of 'calc_rel' when you want calculate only code similarity.
+
+        Args:
+            n1_name (str): A node name of the query graph.
+            n2_name (str): A node name of a workflow graph.
+            remain_c_count (int): The number of uncalculated code similarity. This number is used for calculating MaxSim in other functions.
+        """
         class_code_relatedness=self.class_code_relatedness
         if self.attr_of_db_node_type[n2_name] == "Cell" and self.attr_of_q_node_type[n1_name] == "Cell": #type: cell
             remain_c_count-=1
@@ -3091,8 +3166,8 @@ class WorkflowMatching:
         else:
             return 0.0, remain_c_count
 
-    def calc_rel_o(self, n1_name, n2_name):
-        class_code_relatedness=self.class_code_relatedness
+    def calc_rel_o(self, n1_name:str, n2_name:str) -> float:
+        """Call this function instead of 'calc_rel' when you want calculate only output similarity."""
         if self.attr_of_db_node_type[n2_name] == "Display_data" and self.attr_of_q_node_type[n1_name] == "Display_data": #type: Display_data
             if self.w_d==0:
                 return 0
@@ -3110,7 +3185,8 @@ class WorkflowMatching:
             return 0.0
 
 
-    def calc_rel_v(self, n1_name, n2_name):
+    def calc_rel_v(self, n1_name:str, n2_name:str) -> float:
+        """Call this function instead of 'calc_rel' when you want calculate only data similarity."""
         if self.attr_of_db_node_type[n2_name] == "Var" and self.attr_of_q_node_type[n1_name] == "Var": #type: var
             self.calc_v_count+=1
             if self.w_v==0:
@@ -3137,8 +3213,19 @@ class WorkflowMatching:
         else:
             return 0.0
 
-    def calc_rel_v_2(self, n1_name, n2_name, remain_v_count):
-        class_code_relatedness=self.class_code_relatedness
+    def calc_rel_v_2(self, n1_name:str, n2_name:str, remain_v_count) -> Tuple[float, int]:
+        """
+        For calculating data similarity.
+        Call this function instead of 'calc_rel'.
+
+        Args:
+            n1_name (str): A node name of the query graph.
+            n2_name (str): A node name of a workflow graph.
+            remain_v_count (int): The number of uncalculated data similarity. This number is used for calculating MaxSim in other functions.
+
+        Returns:
+            Tuple[float, int]: A tuple of a product of data similarity and the data weight, and the number of uncalculated data similarity.
+        """
         if self.attr_of_db_node_type[n2_name] == "Var" and self.attr_of_q_node_type[n1_name] == "Var": #type: var
             self.calc_v_count+=1
             remain_v_count-=1
@@ -3168,6 +3255,9 @@ class WorkflowMatching:
             return 0.0, remain_v_count
 
     def calc_rel_v_approximately(self, n1_name, n2_name):
+        """
+        For development.
+        """
         if self.w_v==0:
             return 0
         if self.attr_of_db_node_type[n2_name] == "Var" and self.attr_of_q_node_type[n1_name] == "Var": #type: var
@@ -3185,8 +3275,10 @@ class WorkflowMatching:
             return sim * self.w_v
         else:
             return 0
-    # 使用
+
+    # 不使用
     def calc_rel_between_db_node_with_timecount(self, n1_name, n2_name):
+        """For development."""
         calc_start_time = timeit.default_timer()
         ret=self.calc_rel_between_db_node(n1_name, n2_name)
         calc_end_time = timeit.default_timer()
@@ -3196,8 +3288,9 @@ class WorkflowMatching:
             self.calculated_sim={}
         return ret
 
-    # 使用
+    # 不使用
     def calc_rel_between_db_node(self, n1_name, n2_name):
+        """For development."""
         class_code_relatedness=self.class_code_relatedness
         if self.attr_of_db_node_type[n2_name] == "Cell" and self.attr_of_db_node_type[n1_name] == "Cell": #type: cell
             if self.w_c==0:
@@ -3252,21 +3345,20 @@ class WorkflowMatching:
             return 0.0
 
     # 使用
-    def calc_nb_score3(self, w_c=None, w_v=None, w_l=None, w_d=None):
+    def calc_nb_score3(self, w_c:float=None, w_v:float=None, w_l:float=None, w_d:float=None) -> Tuple[int, int]:
         """
         スコア計算部分の時間計測あり
         self.ans_listの集合 --- ノード名(str)
 
         Args:
-            w_c: セル類似度をNBスコアにする際の重み
-            w_v: テーブル類似度をNBスコアにする際の重み
+            w_c: the weight of code similarity.
+            w_v: the weight of data similarity.
+            w_l: the weight of library similarity.
+            w_d: the weight of output similarity.
         """
 
         self.init_each_calc_time_sum()
-        for w in [w_c, w_v, w_l, w_d]:
-            if not w is None:
-                self.set_each_w(w_c, w_v, w_l, w_d)
-                break
+        self.set_each_w(w_c, w_v, w_l, w_d)
 
         self.nb_score={}
         count=0
@@ -3295,21 +3387,21 @@ class WorkflowMatching:
         return count, nb_count
 
     # 使用
-    def calc_nb_score3_2(self, w_c=None, w_v=None, w_l=None, w_d=None):
+    def calc_nb_score3_2(self, w_c:float=None, w_v:float=None, w_l:float=None, w_d:float=None) -> Tuple[int, int]:
         """
-        スコア計算部分の時間計測あり
+        For naive method and micro-benchmark for the proposal method.
+        Time each calculations.（スコア計算部分の時間計測あり．）
         self.ans_listの集合 --- ノード名(str)
 
         Args:
-            w_c: セル類似度をNBスコアにする際の重み
-            w_v: テーブル類似度をNBスコアにする際の重み
+            w_c: the weight of code similarity.
+            w_v: the weight of data similarity.
+            w_l: the weight of library similarity.
+            w_d: the weight of output similarity.
         """
         self.set_flg_running_faster(False, False, False, False)
         self.init_each_calc_time_sum()
-        for w in [w_c, w_v, w_l, w_d]:
-            if not w is None:
-                self.set_each_w(w_c, w_v, w_l, w_d)
-                break
+        self.set_each_w(w_c, w_v, w_l, w_d)
 
         self.nb_score={}
         count=0
@@ -3392,8 +3484,9 @@ class WorkflowMatching:
         return count, nb_count
 
     # 使用 現状最速
-    def calc_nb_score_for_new_proposal_method_2_3(self, w_c=None, w_v=None, w_l=None, w_d=None):
+    def calc_nb_score_for_new_proposal_method_2_3(self, w_c:float=None, w_v:float=None, w_l:float=None, w_d:float=None):
         """
+        The similairty calculation component of the proposed method.
         スコア計算部分の時間計測あり
         self.ans_listの集合 --- ノード名(str)
         データ関連度の重みがゼロの時はもっと高速な別の関数に切り替える．
@@ -3402,16 +3495,18 @@ class WorkflowMatching:
         + flg_running_fasterの比較回数を最小限にした．
         """
         self.init_each_calc_time_sum()
+        self.nb_score={}
+
         for w in [w_c, w_v, w_l, w_d]:
             if not w is None:
                 self.set_each_w(w_c, w_v, w_l, w_d)
                 break
         if not self.flg_running_faster["flg_prune_under_sim"]:
+            # For micro-benchmark.
             return self.calc_nb_score3_2()
         if self.w_v==0:
             return self.calc_nb_score_for_new_proposal_method_2_3_wv0()
 
-        self.nb_score={}
         v_count=len(self.query_table) # 下限値の導出に利用. 1サブグラフあたりのラベルがデータのペアの数.
 
         count=0
@@ -3501,11 +3596,10 @@ class WorkflowMatching:
         return count, nb_count #あとで消す
 
     # 使用 現状最速
-    def calc_nb_score_for_new_proposal_method_2_3_wv0(self, w_c=None, w_v=None, w_l=None, w_d=None):
+    def calc_nb_score_for_new_proposal_method_2_3_wv0(self) -> Tuple[int, int]:
         """
-        w_v=0のとき
+        Call this function for the similairty calculation component of the proposed method if the data sim weight is zero.
         """
-        self.nb_score={}
         c_count=len(self.query_cell_code) # 下限値の導出に利用. 1サブグラフあたりのラベルがデータのペアの数.
 
         count=0 #あとで消す
@@ -3581,14 +3675,14 @@ class WorkflowMatching:
     #使用
     def calc_lib_score(self, lib_list1:list, lib_list2:list) -> float:
         """
-        ライブラリ類似度を計算する．
+        Calculate the library similarity as Jaccard similarity coefficient.
 
         Args:
-            lib_list1 (list[str]): list of name of libraries using in the notebook
-            lib_list2 (list[str]): list of name of libraries using in the notebook
+            lib_list1 (list[str]): a list of name of libraries given as the query.
+            lib_list2 (list[str]): a list of name of libraries used in a computational notebook.
 
         Returns:
-            float-like: similarity score between given libraries lists.
+            float: library similarity between given libraries lists.
         """
         calc_lib_start_time = timeit.default_timer()
         lib_score = self.jaccard_similarity_coefficient(lib_list1, lib_list2)
@@ -3596,26 +3690,16 @@ class WorkflowMatching:
         self.each_calc_time_sum["Library"]+=calc_lib_end_time-calc_lib_start_time
         return lib_score
 
-    def top_k_nb(self, k):
-        #for nb_name in self.ans_list:
-        #    for subgraph in self.ans_list[nb_name]:
-        #        for n_tuple in subgraph:
-        #            if type(n_tuple[0]) == type("str"):
-        #                self.calc_nb_score2()
-        #            else:
-        #                self.calc_nb_score()
-        #            break
-        #        break
-        #    break
-
-        #print(self.nb_score)
-            
+    def top_k_nb(self, k:int) -> list:
+        """
+        Args:
+            k (int): a natural number for top-k search on computational notebooks.
+        Returns:
+            list: a sorted list of top-k computational notebooks with each similarity.
+        """
         sorted_nb_score = sorted(self.nb_score.items(), key=lambda x:x[1], reverse=True)
-        self.k = min(len(sorted_nb_score), k)
-        #ret=[]
-        #for i in range(k):
-            #ret.append(sorted_nb_score[i])
-        ret=sorted_nb_score[:self.k]
+        k_tmp = min(len(sorted_nb_score), k)
+        ret=sorted_nb_score[:k_tmp]
         self.top_k_score=ret
         return ret
          
@@ -3653,6 +3737,9 @@ class WorkflowMatching:
         print(self.top_k_score)       
 
     def fetch_source_code_table(self, cleaned_nb_name:str) -> pd.DataFrame:
+        """
+        Fetch the table of source codes and return it in form of DataFrame.
+        """
         if cleaned_nb_name in self.cell_source_code:
             return self.cell_source_code[cleaned_nb_name]
         
@@ -3672,11 +3759,13 @@ class WorkflowMatching:
         
     def fetch_var_table(self, table_name:str) -> pd.DataFrame:
         """
+        Fetch the table of source codes and return it in form of DataFrame.
+
         Args:
-            table_name (str): f'rtable{セル番号}_{変数名}_{NB名}'の文字列．
+            table_name (str): String of f'rtable{cell id}_{variable name}_{notebook name}'. f'rtable{セル番号}_{変数名}_{NB名}'の文字列．
         
         Returns:
-            DataFrame
+            pd.DataFrame:
         """
 
         if self.flg_use_artifical_dataset and self.is_artifical_dataset(table_name):
@@ -3906,7 +3995,7 @@ class WorkflowMatching:
         ret_score=1-(graph_edit_dist/self.normalization)
         return ret_score
 
-    def calc_table_rel(self, tableA, tableB):
+    def calc_table_rel(self, tableA:pd.DataFrame, tableB:pd.DataFrame) -> float:
         """
         一時的に _tmp 付与している
         引数で与えた2テーブルに対し，ジャカード係数を元に類似度を計算する．
@@ -3994,7 +4083,7 @@ class WorkflowMatching:
         self.calc_v_microbenchmark["table_rel"]+=end_time_table_rel-start_time_table_rel
         return rel_score
 
-    def calc_table_rel_between_query_and_db(self, query_node_name, tableB):
+    def calc_table_rel_between_query_and_db(self, query_node_name:str, tableB:pd.DataFrame) -> float:
         """
         引数で与えた2テーブルに対し，ジャカード係数を元に類似度を計算する．
 
@@ -4146,6 +4235,10 @@ class WorkflowMatching:
 
 
     def fetch_all_library_from_db(self, cleaned_nb_name:str) -> List[str]:
+        """
+        Cache library names of the all computational notebooks in database, 
+        and return a list of library names used in 'cleaned_nb_name' computational notebooks.
+        """
         if cleaned_nb_name in self.library:
             return self.library[cleaned_nb_name]
         logging.info("collecting library info...")
@@ -4165,7 +4258,9 @@ class WorkflowMatching:
         return self.library[cleaned_nb_name]
         
 
+    # 不使用
     def fetch_library_in_particular_nb_from_db(self, nb_name):
+        """For development."""
         if nb_name in self.library:
             return self.library[nb_name]
 
@@ -4190,7 +4285,7 @@ class WorkflowMatching:
         return self.library[nb_name]
 
 
-    def fetch_multiset_of_display_type_from_db(self, cleaned_nb_name):
+    def fetch_multiset_of_display_type_from_db(self, cleaned_nb_name:str) -> List[str]:
         """
         Returns:
             list(str): multiset of display data type that the nb outputs.
@@ -4238,14 +4333,14 @@ class WorkflowMatching:
                 logging.info("collecting display type and cell id info : failed.")
         return self.display_type_and_cell_id[cleaned_nb_name]
 
-
+    # 不使用
     def calc_library_sim(self, cleaned_nb_name1, cleaned_nb_name2):
         lib_list1 = self.fetch_all_library_from_db(cleaned_nb_name1)
         lib_list2 = self.fetch_all_library_from_db(cleaned_nb_name2)
         return self.calc_lib_score(lib_list1, lib_list2)
 
     # 提案手法で使用
-    def flg_prune_under_sim(self, visited, current_score, max_c_score=1, max_v_score=1, max_d_score=1):
+    def flg_prune_under_sim(self, visited:List[str], current_score:float, max_c_score:float=1, max_v_score:float=1, max_d_score:float=1) -> bool:
         """
         Args:
             max_c_score (int or float or int-like): とりうるセル類似度の最大値
@@ -4255,13 +4350,7 @@ class WorkflowMatching:
             return False
         
         # k番目のスコアの値をセット
-        #count=0
-        #k_score=0
         self.top_k_score=sorted(self.nb_score.items(), key=lambda d: d[1], reverse=True)
-        #for nb_name in self.top_k_score:
-        #    count+=1
-        #    if count==self.k:
-        #        k_score=self.top_k_score[nb_name]
         k_score=self.top_k_score[self.k-1][1]
 
         c_count=0
@@ -4300,7 +4389,7 @@ class WorkflowMatching:
             return False
 
     # 新しい方の提案手法 関数new_proposal_method で使用 （var以外にも対応）
-    def flg_prune_under_sim_for_new_proposal_method_3(self, weight, remain_count, current_score, compare_score, max_score=1):
+    def flg_prune_under_sim_for_new_proposal_method_3(self, weight:float, remain_count:int, current_score:float, compare_score:float, max_score:float=1) -> bool:
         under_limit = compare_score - weight * (remain_count * max_score) - current_score
         if under_limit>0:
             return True
@@ -4308,7 +4397,7 @@ class WorkflowMatching:
             return False
 
     @staticmethod
-    def jaccard_similarity_coefficient(colA, colB):
+    def jaccard_similarity_coefficient(colA:list, colB:list) -> float:
         """
         The Jaccard similarity between two sets A and B is defined as
         |intersection(A, B)| / |union(A, B)|.
@@ -4338,7 +4427,7 @@ class WorkflowMatching:
         return self.jaccard_similarity_coefficient(colA, colB)
 
     @staticmethod
-    def row_similarity(colA, colB):
+    def row_similarity(colA:list, colB:list) -> float:
         # search/search_tables.pyからコピー
         colA_value = colA[~pd.isnull(colA)].values # null値は除去
         colB_value = colB[~pd.isnull(colB)].values
@@ -4348,7 +4437,7 @@ class WorkflowMatching:
         return row_sim
 
     @staticmethod
-    def col_similarity(tableA, tableB, SM, key_factor):
+    def col_similarity(tableA:pd.DataFrame, tableB:pd.DataFrame, SM:dict, key_factor:float) -> float:
         """
         Args:
             tableA : 表形式データ
@@ -4369,9 +4458,9 @@ class WorkflowMatching:
         return col_sim
 
 
-    def previous_calc_output_sim(self, nb_name):
+    def previous_calc_output_sim(self, nb_name:str) -> float:
         """
-        return True if num of any workflow components is less than query
+        Calculate output similarity for set-based methods.
         """
         calc_outputs_start_time = timeit.default_timer()
         count_1=0
@@ -4393,6 +4482,7 @@ class WorkflowMatching:
 
     def existing_method_calc_table_sim(self):
         """
+        Calculate data similarity for the data-based search method.
         表データだけをみてtop-kのスコアにする．(self.nb_scoreにセット)
         ノートブック内の表データのうち，クエリと最も類似度が高くなる組み合わせでノートブックをスコアリングする．
         """
@@ -4425,7 +4515,7 @@ class WorkflowMatching:
                 visited_n_q.append(sorted_list[i][0][0])
                 self.nb_score[nb_name]+=sorted_list[i][1]
 
-    def existing_method_calc_table_sim_particular_nb(self, nb_name):
+    def existing_method_calc_table_sim_particular_nb(self, nb_name:str):
         # 2021/01/20修正
         #calc_var_start_time = timeit.default_timer()
         sim_list={}
@@ -4452,6 +4542,7 @@ class WorkflowMatching:
         #self.each_calc_time_sum["Var"]+=(calc_var_end_time-calc_var_start_time) #重複（calc_rel_with_timecountですでに足されている）
         return ret_score
 
+    # 不使用
     def get_sum_of_table_size(self):
         q_table_size_sum=0
         db_table_size_sum=0
@@ -4480,6 +4571,7 @@ class WorkflowMatching:
 
     def existing_method_calc_code_sim(self):
         """
+        Calculate code similarity for the code-based search method (C).
         セルを頭から結合したソースコードだけをみてtop-kのスコアにする．(self.nb_scoreにセット)
         """
         class_code_relatedness=self.class_code_relatedness
@@ -4517,7 +4609,7 @@ class WorkflowMatching:
             self.each_calc_time_sum["Cell"]+=calc_code_end_time-calc_code_start_time
             self.nb_score[nb_name]=sim
 
-    def combining_query_code(self):
+    def combining_query_code(self) -> str:
         # get query source code
         stack_n=[self.query_root]
         query_code_list=[]
@@ -4566,6 +4658,10 @@ class WorkflowMatching:
             
 
     def existing_method_sum(self):
+        """
+        Set-based search method w/o optimization.
+        Save computational notebook similarity in self.nb_score.
+        """
         self.init_each_calc_time_sum()
         self.nb_score={}
         nb_score_according_to_table_sim={}
@@ -4593,7 +4689,14 @@ class WorkflowMatching:
                 output_rel = self.previous_calc_output_sim(nb_name)
             self.nb_score[nb_name]=lib_rel * self.w_l + nb_score_according_to_table_sim[nb_name] * self.w_v + nb_score_according_to_code_sim[nb_name] * self.w_c + output_rel*self.w_d
 
-    def existing_method_sum_fast_method(self, k):
+    def existing_method_sum_fast_method(self, k:int):
+        """
+        Set-based search method with optimization.
+        Save computational notebook similarity in self.nb_score.
+
+        Args:
+            k (int): a natural number for top-k search on computational notebooks.
+        """
         self.k=k
         self.init_each_calc_time_sum()
         self.nb_score={}
@@ -4642,6 +4745,10 @@ class WorkflowMatching:
                         self.nb_score[nb_name]=current_nb_score[nb_name]+self.w_v*self.existing_method_calc_table_sim_particular_nb(nb_name)
             
     def existing_method_sum_fast_method_w_v0(self):
+        """
+        Call this function for set-based search method with optimization if data weight is zero.
+        Save computational notebook similarity in self.nb_score.
+        """
         current_nb_score={}
         for nb_name in self.valid_nb_name:
             if self.w_l!=0:
@@ -4670,8 +4777,9 @@ class WorkflowMatching:
         else:
             self.nb_score=current_nb_score
             
-    def get_table_size1(self, table):
+    def get_table_size1(self, table:pd.DataFrame):
         """
+        For development.
         テーブルのカラム数および行数を調べる．
 
         Args:
@@ -4688,6 +4796,7 @@ class WorkflowMatching:
 
     def get_table_size2(self, table):
         """
+        For development.
         テーブルのカラム数，行数に加えて，
         データ型ごとのカラム数を調べる．
 
@@ -4715,6 +4824,7 @@ class WorkflowMatching:
     
     def get_table_size3(self, table, kilo=False):
         """
+        For development.
         テーブルサイズをバイト数で返す．
 
         Args:
@@ -4741,7 +4851,7 @@ class WorkflowMatching:
 
     # Juneauの適用
 
-    def sketch_query_cols(self, query, sz=5) -> list:
+    def sketch_query_cols(self, query:pd.DataFrame, sz:int=5) -> List[str]:
         # 疑問: データがfloat型のみの場合はサンプリングがうまくいかない(szより列数が小さくなる可能性がある)と思われるが, どうなのか.(sketch_column_and_row_for_meta_mappingも)
         """
         引数のテーブルqueryに対し，引数szで指定する最大列数以下のテーブルの列名をlistで返す．
@@ -4780,12 +4890,9 @@ class WorkflowMatching:
             return q_cols_chosen
 
 
-    def sketch_column_and_row_for_meta_mapping(self, sz=5, row_size=1000):
+    def sketch_column_and_row_for_meta_mapping(self, sz:int=5, row_size:int=1000):
         # 疑問: データがfloat型のみの場合はサンプリングがうまくいかない(szより列数が小さくなる可能性がある)と思われるが, どうなのか.(sketch_query_colsも)
         """
-        変更点：schema_elementを引数とし，schema_element_sample_colを返す関数に変更．
-        
-        
         テーブルself.schema_elementについて，各テーブルグループに対して列数および行数が指定の最大数以下となるように，
         テーブルグループごとにデータをサンプリングする．
         サンプリングの結果はself.schema_element_sample_colに格納．
@@ -4851,8 +4958,12 @@ class WorkflowMatching:
                     count += 1
 
 
-    def init_schema_mapping(self, max_table_groups=1001001):
-        # search_withprov.pyから
+    def init_schema_mapping(self, max_table_groups:int=1001001):
+        """
+        Original: Juneau/search_withprov.py
+
+        開発用．        
+        """
 
         logging.info("Start Reading From Neo4j!")
         #matcher = NodeMatcher(self.geng)
@@ -4968,7 +5079,7 @@ class WorkflowMatching:
 
     def save_schema_mapping_json(self):
         """
-        開発用
+        開発実験用．
         """
         current_dir_path = os.getcwd()
 
@@ -4991,7 +5102,7 @@ class WorkflowMatching:
         
     def init_schema_mapping_json(self):
         """
-        開発用
+        開発実験用．
         """
         current_dir_path = os.getcwd()
         with open(f"{current_dir_path}/sample_profiled_dataset/schema_element.json", encoding='utf-8') as f:
@@ -5249,7 +5360,7 @@ class WorkflowMatching:
 
     """
 
-    def sample_rows_for_each_column(self, row_size=1000):
+    def sample_rows_for_each_column(self, row_size:int=1000):
         """
         テーブルself.schema_elementについて，各テーブルグループに対して行数が指定の最大行数以下となるように，
         テーブルグループごとにデータをサンプリングする．
@@ -5277,9 +5388,11 @@ class WorkflowMatching:
                     )
 
 
-    def schema_mapping(self, tableA, tableB, meta_mapping, gid):
+    def schema_mapping(self, tableA:pd.DataFrame, tableB:pd.DataFrame, meta_mapping:dict, gid:int) -> Tuple[dict, float]:
         """
-        withprov_optから
+        Original: Juneau/withprov_opt.py
+
+        スキーママッピング（2つの表の列の対応関係）を作成する．
         """
         s_mapping = {} # dict{}: 内容は{sid: 列名}
         t_mapping = {} # dict{}: 内容は{sid: 列名}
@@ -5316,10 +5429,10 @@ class WorkflowMatching:
     def comp_table_similarity_key(
         self, 
         SM_test,
-        tableA,
-        tableB,
-        SM,
-        gid,
+        tableA:pd.DataFrame,
+        tableB:pd.DataFrame,
+        SM:dict,
+        gid:int,
         meta_mapping,
         schema_linking,
         thres_key_prune,
@@ -5393,7 +5506,7 @@ class WorkflowMatching:
             return col_sim, row_sim, meta_mapping, unmatched, sm_time, key_chosen
 
 
-    def app_common_key(self, tableA, tableB, SM, key, thres_prune) -> float:
+    def app_common_key(self, tableA:pd.DataFrame, tableB:pd.DataFrame, SM:dict, key, thres_prune:float) -> float:
         kyA = key
         kyB = SM[key]
         key_value_A = tableA[kyA].tolist()
@@ -5457,16 +5570,16 @@ class WorkflowMatching:
                 break
         return res
     
-    def remove_dup_with_scores(self, ranked_list, ks):
+    def remove_dup_with_scores(self, ranked_list, ks) -> List[str, float, str]:
         """
         3要素リストの重複を取り除く．
 
         Args:
-            ranked_list (list[any, any, any]): 重複を含んでいる可能性がある3要素リスト．
+            ranked_list (list[any, any, any]): 重複を含んでいる可能性がある3要素リスト[table name, score, key_chosen].
             ks (int): リストの最大サイズ.
         
         Returns:
-            ranked_list (list[any, any, any]): 最大サイズksの重複を含まない3要素リスト．
+            ranked_list (list[any, any, any]): 最大サイズksの重複を含まない3要素リスト[table name, score, key_chosen]．
         """
         res = []
         for i, j, l in ranked_list:
@@ -5726,8 +5839,8 @@ class WorkflowMatching:
         return rtables
 
     def search_similar_tables_threshold2_with_scores(
-        self, query, beta, k, theta, thres_key_cache, thres_key_prune, tflag=False
-    ):
+        self, query:pd.DataFrame, beta:float, k:int, theta:float, thres_key_cache:float, thres_key_prune:float, tflag:bool=False
+    ) -> List[str, pd.DataFrame, float]:
 
         self.query = query
         self.query_fd = {}
@@ -5930,7 +6043,10 @@ class WorkflowMatching:
         return rtables
 
 
-    def calc_table_rel_using_juneau(self, tnameA, tableA, k_juneau):
+    def calc_table_rel_using_juneau(self, tnameA:str, tableA:pd.DataFrame, k_juneau:int):
+        """
+        Juneauを使用してテーブルデータを<k_juneau>件検索し，その過程で得た類似度をself.calculated_simに格納する．
+        """
         rtables=self.search_similar_tables_threshold2_with_scores(query=tableA, beta=0.1, k=k_juneau, theta=10, thres_key_cache=0.2, thres_key_prune=0.9, tflag=True)
         for tname, _, score in rtables:
             tgroup = self.table_group[tname]
@@ -5938,7 +6054,7 @@ class WorkflowMatching:
                 if tgroup == tgroupB:
                     self.calculated_sim[(tnameA, tnameB)]=score
 
-    def calc_all_tables_rel_using_juneau(self, k_juneau=20):
+    def calc_all_tables_rel_using_juneau(self, k_juneau:int=20):
         """
         クエリセット後かつ検索の実行前にこれを実行するとjuneauを適用できる．
         """
@@ -5948,20 +6064,36 @@ class WorkflowMatching:
             self.calc_table_rel_using_juneau(tnameA,tableA, k_juneau)
 
 
-    def search_using_only_juneau(self, k_juneau):
+    def search_using_only_juneau(self, k_juneau:int):
+        """
+        Juneauを使用してテーブルデータを上位<k_juneau>件検索する．テーブルデータの類似度は未ソートでself.nb_scoreに格納する．
+
+        Args:
+            k_juneau (int): Juneauのパラメータk．上位何件のテーブルデータを返すかの指定．
+        """
         for tnameA, tableA in self.query_table.items():
             #tableA = self.fetch_var_table(nname)
             rtables=self.search_similar_tables_threshold2_with_scores(query=tableA, beta=0.1, k=k_juneau, theta=10, thres_key_cache=0.2, thres_key_prune=0.9, tflag=True)
-            for tnameB, _, score in rtables:
-                nb_name = tnameB[tnameB.rfind("_")+1:]
+            for tablename, _, score in rtables:
+                nb_name = tablename[tablename.rfind("_")+1:]
                 if nb_name not in self.nb_score:
                     self.nb_score[nb_name] = 0
                 self.nb_score[nb_name] += score
            
     
     """人工データセット適用"""
-    def load_artifical_dataset(self, dataset_size, change_id_list_path, change_libraries_list_path, retrieval_system_path):
-        """人工データセット読み込み"""
+    def load_artifical_dataset(self, dataset_size:int, change_id_list_path:str, change_libraries_list_path:str, retrieval_system_path:str) -> int:
+        """
+        人工データセット読み込み
+        データセットのワークフローグラフself.Gに人工データセットを追加．
+        人工データセットは，既存の111個のノートブックをコピーし，ノードを1個増減させたりライブラリを数個増減させることによって追加している．
+        
+        Args:
+            dataset_size (int): 1以上100以下の整数パラメータ．データセットを何倍するかの指定．An int parameter to specify the number of times of dataset.
+            change_id_list_path (str): 人工データセットについての情報が書かれたcsvのパス．
+            change_libraries_list_path (str): ライブラリについての情報が書かれたchange_libraries_list.csvのパス．
+            retrieval_system_path (str): dict_nb_name_and_cleaned_nb_nameなどを読むためのベースのパス．
+        """
         if dataset_size==1:
             return 0
         self.flg_use_artifical_dataset=True
@@ -6099,9 +6231,14 @@ class WorkflowMatching:
         return 1
 
 
-    def load_libraries_of_artifical_dataset(self, dataset_size, change_libraries_list_path):
+    def load_libraries_of_artifical_dataset(self, dataset_size:int, change_libraries_list_path:str):
         """
-        人工データとして、change_libraries_list.csvを読み込む。
+        人工データとして、change_libraries_list.csvをself.libraryに読み込む。
+        dataset_sizeのみ取り出すのは時間がかかるので，現状は，dataset_size以上の数を読み込んでいる．
+
+        Args:
+            dataset_size (int): 1以上100以下の整数パラメータ．データセットを何倍するかの指定（現状未使用）．
+            change_libraries_list_path (str): ライブラリについての情報が書かれたchange_libraries_list.csvのパス．
         """
         with open(change_libraries_list_path, mode="r") as f:
             load_contents=f.read()
@@ -6151,10 +6288,16 @@ class WorkflowMatching:
         """
 
 
+    def is_artifical_dataset(self, cleaned_nb_name:str) -> bool:
+        """
+        cleaned_nb_nameの語尾がcp1などの場合，それは人工データなので除く．
 
-    def is_artifical_dataset(self, cleaned_nb_name):
-        """データセットを100倍まで増加させているとき"""
-        # cleaned_nb_nameの語尾がcp1などの場合，それは人工データなので除く
+        Args:
+            cleaned_nb_name (str): コピーを含む加工済みの計算ノートブック名．コピー元ならアンダーバーを取り除くなどしたもので，コピー後ならそれらにcp<ID>が末尾に付与されている．IDは整数．
+        
+        Returns:
+            bool: Trueなら人工データセットでのみ含む計算ノートブック，Falseならオリジナルのデータセットに含まれる計算ノートブック．
+        """
         if "cp" not in cleaned_nb_name:
             return False
         elif cleaned_nb_name[-1:] in NUM_STR_LIST:
@@ -6167,7 +6310,11 @@ class WorkflowMatching:
                 return True
         return False
 
+
     def load_dict_nb_name_and_cleaned_nb_name(self, retrieval_system_path:str):
+        """
+        load_artifical_datasetで人工データセットを読み込む際に必要．
+        """
         with open(f"{retrieval_system_path}/dict_nb_name_and_cleaned_nb_name.json", mode="r") as f:
             load_json=f.read()
             self.dict_nb_name_and_cleaned_nb_name=json.loads(load_json)
@@ -6178,3 +6325,291 @@ class WorkflowMatching:
             load_json=f.read()
             self.dict_nb_name_dir=json.loads(load_json)
     
+    # 以下，提案手法にjuneauを適用させるためのコード
+
+    def calc_one_data_similarity_using_juneau(
+        self, 
+        nb_name:str, 
+        tname, 
+        query_col,
+        SM_test,
+        beta:float, 
+        k:int, 
+        theta:float, 
+        thres_key_cache:float, 
+        thres_key_prune:float, 
+        tflag:bool=False, 
+    ) -> List[str, pd.DataFrame, float]:
+        """tableR: nb_nameのtable"""
+
+        gid = self.table_group[tname]
+
+        #self.query = query
+        #self.query_fd = {}
+        #self.already_map = {}
+        #SM_test = SchemaMapping()
+
+        start_time1 = timeit.default_timer()
+
+        #for i in self.schema_linking.keys():
+        #    self.already_map[i] = {}
+
+        #query_col = self.sketch_query_cols(query)
+        #self.sketch_column_and_row_for_meta_mapping()#追加
+        self.sketch_column_and_row_for_meta_mapping_for_one_notebook(gid)
+        #self.sample_rows_for_each_column()#追加
+        self.sample_rows_for_each_column_for_one_notebook(gid)
+
+        
+        time1 = 0
+        start_time = timeit.default_timer()
+        # Do mapping
+        meta_mapping = SM_test.mapping_naive_tables(
+            self.query,
+            query_col,
+            self.schema_element_sample_col, # self.schema_element_sample_col,
+            self.schema_element_dtype, # self.schema_element_dtype,
+        )
+        end_time = timeit.default_timer()
+        time1 += end_time - start_time
+        
+        
+        # Compute unmatched pairs
+        unmatched = {}
+        for i in meta_mapping.keys():
+            unmatched[i] = {}
+            for j in self.query.columns.tolist(): # .tolist(): リスト型listに変換
+                unmatched[i][j] = {}
+                if (j in query_col) and (j not in meta_mapping[i]):
+                    #for l in self.schema_element_sample_row[i].keys():
+                    for l in self.schema_element_sample_row[i].keys():
+                        unmatched[i][j][l] = ""
+
+
+        top_tables = []
+        Cache_MaxSim = {}
+
+        rank2 = []
+        rank_candidate = []
+
+
+        #for i in self.real_tables.keys():
+
+        tname = i
+        #gid = self.table_group[tname[6:]]
+        #gid = self.table_group[tname]
+        #if gid not in meta_mapping:
+        #    continue
+
+        tableS = self.query
+        tableR = self.real_tables[i]
+
+        start_time = timeit.default_timer()
+        #SM, ms = self.schema_mapping(tableS, tableR, meta_mapping, gid)
+        SM, ms = self.schema_mapping(tableS, tableR, meta_mapping, gid)
+        end_time = timeit.default_timer()
+        time1 = time1 + end_time - start_time
+        Cache_MaxSim[tname] = ms
+
+        if len(SM.items()) == 0:
+            return 0
+
+        tableSnotintableR = []
+        for sk in tableS.columns.tolist(): # .tolist(): リスト型listに変換
+            if sk not in SM:
+                tableSnotintableR.append(sk)
+
+        vname_score = float(1) / float(
+            len(tableR.columns.values) + len(tableSnotintableR)
+        )
+
+        vname_score2 = float(
+            min(len(tableS.columns.tolist()), len(tableR.columns.tolist())) - 1
+        ) / float(len(tableR.columns.values) + len(tableSnotintableR) - 1)
+
+        ubound = beta * vname_score2 + float(1 - beta) * Cache_MaxSim[tname]
+
+        rank2.append(ubound)
+        rank_candidate.append((tname, vname_score, SM))
+
+        rank2 = sorted(rank2, reverse=True)
+        rank_candidate = sorted(rank_candidate, key=lambda d: d[1], reverse=True)
+
+        
+        if len(rank_candidate) == 0:
+            return []
+
+        if len(rank_candidate) > k:
+            ks = k
+        else:
+            ks = len(rank_candidate)
+            
+        #for i in range(ks):
+        #tableR = self.real_tables[rank_candidate[i][0]]
+        tableR = self.real_tables[rank_candidate[i][0]]
+        #gid = self.table_group[rank_candidate[i][0][6:]]
+        #gid = self.table_group[rank_candidate[i][0]]
+        SM_real = rank_candidate[i][2]
+        (
+            col_sim,
+            row_sim,
+            meta_mapping,
+            unmatched,
+            sm_time,
+            key_chosen,
+        ) = self.comp_table_similarity_key(
+            SM_test,
+            query,
+            tableR,
+            SM_real,
+            gid,
+            meta_mapping,
+            self.schema_linking, # self.schema_linking,
+            thres_key_prune,
+            thres_key_cache,
+            unmatched,
+        )
+        score = beta * col_sim + float(1 - beta) * row_sim #追加
+        #score = float(1 - beta) * col_sim + beta * row_sim #追加
+        top_tables.append((rank_candidate[i][0], score, key_chosen))
+        time1 += sm_time
+
+        top_tables = sorted(top_tables, key=lambda d: d[1], reverse=True)
+        min_value = top_tables[-1][1]
+        
+        ks = ks - 1
+        id = 0
+        #while True:
+        if ks + id >= len(rank_candidate):
+            return 0
+
+        threshold = beta * rank_candidate[ks + id][1] + float(1 - beta) * rank2[0]
+
+        if threshold <= min_value * theta:
+            return 0
+        else:
+            id = id + 1
+            if ks + id >= len(rank_candidate):
+                return 0
+
+            #tableR = self.real_tables[rank_candidate[ks + id][0]]
+            tableR = self.real_tables[rank_candidate[ks + id][0]]
+            #gid = self.table_group[rank_candidate[ks + id][0][6:]]
+            gid = self.table_group[rank_candidate[ks + id][0]]
+            SM_real = rank_candidate[ks + id][2]
+            (
+                col_sim,
+                row_sim,
+                meta_mapping,
+                unmatched,
+                sm_time,
+                key_chosen,
+            ) = self.comp_table_similarity_key(
+                SM_test,
+                self.query,
+                tableR,
+                SM_real,
+                gid,
+                meta_mapping,
+                self.schema_linking,
+                thres_key_prune,
+                thres_key_cache,
+                unmatched,
+            )
+            time1 += sm_time
+            #new_score = rs
+            new_score = beta * col_sim + float(1 - beta) * row_sim #追加
+
+            #if new_score <= min_value:
+            #    continue
+            #else:
+            #    top_tables.append(
+            #        (rank_candidate[ks + id][0], new_score, key_chosen)
+            #    )
+            #    top_tables = sorted(top_tables, key=lambda d: d[1], reverse=True)
+            #    min_value = top_tables[ks][1]
+
+        end_time1 = timeit.default_timer()
+        time3 = end_time1 - start_time1
+
+        logging.info("Schema Mapping Costs: %s Seconds" % time1)
+        logging.info("Full Search Costs: %s Seconds" % time3)
+
+        #rtables_names = self.remove_dup_with_scores(top_tables, ks)
+
+        #rtables = []
+        #for i, j, l in rtables_names:
+        #    rtables.append([i, self.real_tables[i], j])
+
+        #return rtables
+        return new_score
+
+
+    def sketch_column_and_row_for_meta_mapping_for_one_notebook(self, gid:int, sz:int=5, row_size:int=1000):
+        """
+        sketch_column_and_row_for_meta_mappingを1つのテーブルグループに適用する．
+        self.schema_element_sample_col={}の定義が事前に必要．
+        """
+        #self.schema_element_sample_col = {}
+        #for i in self.schema_element.keys(): # 各テーブルグループに対し以下の処理
+        i = gid
+        self.schema_element_sample_col[i] = {}
+        if len(self.schema_element[i].keys()) <= sz: # テーブルグループの列数がsz個以下の時
+            # 表データの行のサンプリング
+            # scはschemaの略か.
+            for sc in self.schema_element[i].keys(): # 指定テーブルグループの各列に対して
+                if len(self.schema_element[i][sc]) < row_size: # 最大行数よりもサンプリング対象の行数が少ない場合は, すべての行を得る.
+                    self.schema_element_sample_col[i][sc] = self.schema_element[i][sc]
+                else: # 最大行数よりもサンプリング対象の行数が多い場合は, 最大行数分だけをランダムに選んで抽出する.
+                    self.schema_element_sample_col[i][sc] = random.sample(
+                        self.schema_element[i][sc], row_size
+                    )
+        else: # サンプリング対象の列数がsz列より多いとき
+            ##
+            # sc_choice ([str, float]): strは列名, floatはその列のデータ(値)の集合に対して, 
+            # |セット集合|/|多重集合|を計算している.(セット集合 = 重複無し集合). 
+            # scはschemaの略か.
+            ##
+            sc_choice = []
+            for sc in self.schema_element[i].keys():
+                if sc == "Unnamed: 0" or "index" in sc:
+                    continue
+                if self.schema_element_dtype[i][sc] is np.dtype(float):
+                    continue
+                sc_value = list(self.schema_element[i][sc]) # テーブルグループIDがi, 列名がscの実データ値をsc_valueに格納
+                # sc列目のデータ集合に対し, |セット集合|/|多重集合|を計算
+                sc_choice.append(
+                    (sc, float(len(set(sc_value))) / float(len(sc_value)))
+                )
+            # その列の値ができるだけバラバラな値をとる順にソートする．
+            sc_choice = sorted(sc_choice, key=lambda d: d[1], reverse=True) #降順
+
+            count = 0
+            for sc, v in sc_choice:
+                if count == sz:
+                    break
+                # 表データの行のサンプリング
+                if len(self.schema_element[i][sc]) < row_size: # 最大行数よりもサンプリング対象の表データの行数が少ない場合は, すべての行を得る.
+                    self.schema_element_sample_col[i][sc] = self.schema_element[i][
+                        sc
+                    ]
+                else: # 最大行数よりもサンプリング対象の表データの行数が多い場合は, 最大行数分だけをランダムに選んで抽出する.
+                    self.schema_element_sample_col[i][sc] = random.sample(
+                        self.schema_element[i][sc], row_size
+                    )
+
+                count += 1
+
+
+    def sample_rows_for_each_column_for_one_notebook(self, gid:int, row_size:int=1000):
+        """
+        sample_rows_for_each_columnを1つのテーブルグループに（i = gidとして）適用し，self.schema_element_sample_row[gid]に格納する．
+        """
+        self.schema_element_sample_row[gid] = {}
+        for sc in self.schema_element[gid].keys(): #各列に対して(sc:列名)
+            if len(self.schema_element[gid][sc]) < row_size: # サンプリング前のデータ数（行数）がrow_sizeより小さければそのままを保持
+                self.schema_element_sample_row[gid][sc] = self.schema_element[gid][sc]
+            else: #サンプリング前のデータ数（行数）がrow_sizeより大きれば, 行をサンプリングして行数をrow_sizeにする．
+                self.schema_element_sample_row[gid][sc] = random.sample(
+                    self.schema_element[gid][sc], row_size
+                )
