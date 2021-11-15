@@ -15,7 +15,7 @@ from django.views import generic
 from django.utils import timezone
 
 from .models import QueryLibrary, QueryNode, QueryEdge, QueryJson
-from .forms import HelloForm, SelectNodeForm, SelectEdgeForm, SelectTypeForm, SelectSavedQueryForm, SelectParentNodeForm, UploadQueryFileForm, UploadTableDataFileForm
+from .forms import HelloForm, SelectNodeForm, SelectEdgeForm, SelectSavedQueryForm, SelectParentNodeForm, UploadQueryFileForm, UploadTableDataFileForm
 
 
 current_dir=os.getcwd()
@@ -242,7 +242,7 @@ def index(request, *args, **kwargs):
     msg['form_setting_node'] = SelectNodeForm()
     msg['form_setting_parent_node'] = SelectParentNodeForm()
     msg['form_delete_edge'] = SelectEdgeForm()
-    msg['form_setting_type'] = SelectTypeForm()
+    #msg['form_setting_type'] = SelectTypeForm()
     msg['form_setting_query'] = SelectSavedQueryForm()
     msg['query_name']=""
     msg["arranged_result"]=""
@@ -416,7 +416,7 @@ def form(request, *args, **kwargs):
     msg['form_setting_node'] = SelectNodeForm().append_choice()
     msg['form_setting_parent_node'] = SelectParentNodeForm().append_choice()
     msg['form_delete_edge'] = SelectEdgeForm().append_choice()
-    msg['form_setting_type'] = SelectTypeForm().append_choice()
+    #msg['form_setting_type'] = SelectTypeForm().append_choice()
     msg['form_setting_query'] = SelectSavedQueryForm().append_choice()
     msg['query_name']=""
     msg['err_msg'] = err_msg
@@ -985,7 +985,7 @@ def searching_top_k_notebooks(wm, w_c, w_v, w_l, w_d, k, flg_chk_invalid_by_work
 
 
 def create_jupyter_url(jupyter_notebook_localhost_number, nb_name):
-    created_url = f"http://localhost:{jupyter_notebook_localhost_number}/notebooks/{nb_name}"
+    created_url = f"http://localhost:{jupyter_notebook_localhost_number}/tree/data/{nb_name}"
     return created_url
 
 def arrange_result_dict_for_html(jupyter_notebook_localhost_number, top_k_result, dict_nb_name_and_cleaned_nb_name):
