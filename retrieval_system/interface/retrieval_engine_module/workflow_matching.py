@@ -2981,7 +2981,7 @@ class WorkflowMatching:
             # Juneauをデータ類似度計算に使うとき．
             return self.wrapper_calc_one_data_similarity_using_juneau(tnameQ=nodenameQ,tnameN=nodenameN)
         else:
-            score = self.inner_calc_data_sim(tnameQ=nodenameQ, tnameN=nodenameN)
+            score = self.inner_calc_data_sim(query_node_name=nodenameQ, tnameN=nodenameN)
             if self.flg_running_faster["flg_caching"]:
                 self.calculated_sim[(nodenameQ, nodenameN)]=score
             return score
@@ -3022,7 +3022,7 @@ class WorkflowMatching:
 
         """
         if self.is_code_match(nodenameQ=n1_name, nodenameN=n2_name):
-            return  self.w_c * self.wrapper_calc_code_sim(tnameQ=n1_name, tnameN=n2_name)
+            return  self.w_c * self.wrapper_calc_code_sim(nodenameQ=n1_name, nodenameN=n2_name)
         elif self.is_data_match(nodenameQ=n1_name, nodenameN=n2_name):
             self.calc_v_count+=1
             """
@@ -3044,7 +3044,7 @@ class WorkflowMatching:
     def calc_rel_c_o(self, n1_name:str, n2_name:str) -> float:
         """Call this function instead of 'calc_rel'(=l_theta, in our paper) when we want to calculate small cost similairty."""
         if self.is_code_match(nodenameQ=n1_name, nodenameN=n2_name):
-            return  self.w_c * self.wrapper_calc_code_sim(tnameQ=n1_name, tnameN=n2_name)
+            return  self.w_c * self.wrapper_calc_code_sim(nodenameQ=n1_name, nodenameN=n2_name)
         elif self.is_output_match(nodenameQ=n1_name, nodenameN=n2_name):
             return self.w_d * self.wrapper_calc_output_sim(nodenameQ=n1_name, nodenameN=n2_name)
         #elif self.is_data_match(nodenameQ=n1_name, nodenameN=n2_name):
@@ -3064,7 +3064,7 @@ class WorkflowMatching:
         """
         if self.is_code_match(nodenameQ=n1_name, nodenameN=n2_name):
             remain_c_count-=1
-            sim = self.wrapper_calc_code_sim(tnameQ=n1_name, tnameN=n2_name)
+            sim = self.wrapper_calc_code_sim(nodenameQ=n1_name, nodenameN=n2_name)
             return sim * self.w_c, remain_c_count
         else:
             return 0.0, remain_c_count
@@ -3344,6 +3344,7 @@ class WorkflowMatching:
         + flg_running_fasterの比較回数を最小限にした．
         """
         self.init_query_col()
+        self.set_all_querytable_col()
         self.init_each_calc_time_sum()
         self.nb_score={}
 
@@ -4910,6 +4911,7 @@ class WorkflowMatching:
         """
 
         logging.info("Start Reading From Neo4j!")
+        start_time=timeit.default_timer()
         #matcher = NodeMatcher(self.geng)
         #matcher = NodeMatcher(graph_db)
 
@@ -5018,7 +5020,9 @@ class WorkflowMatching:
                             set(self.schema_element[idi][col])
                         )
                         self.schema_element_count[idi][col] += 1
+        end_time=timeit.default_timer()
         logging.info("There are %s groups of tables." % len(tables_connected))
+        logging.info(f"Initialized schema mapping: {end_time-start_time} Seconds.")
         #return tables_connected, schema_linking, schema_element, schema_element_count, schema_element_dtype, table_group
 
     def save_schema_mapping_json(self):

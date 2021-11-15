@@ -47,7 +47,7 @@ form {
 .for_debug{
     background-color: rgb(143, 177, 189);
     padding: 1.0rem 0; 
-    visibility: visible;
+    visibility: hidden;
 }
 
 .label{
