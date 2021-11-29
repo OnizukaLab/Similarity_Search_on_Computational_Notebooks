@@ -2,7 +2,7 @@
 
 # 計算ノートブックの類似検索
 
-![the interface](images/screenshot1.png "screenshot1")
+![the interface](retrieval_system/images/screenshot1.png "screenshot1")
 
 
 ## デモ

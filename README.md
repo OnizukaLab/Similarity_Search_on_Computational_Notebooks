@@ -3,7 +3,7 @@
 
 # Similarity Search on Computational notebooks
 
-![the interface](../images/screenshot1.png "screenshot1")
+![the interface](retrieval_system/images/screenshot1.png "screenshot1")
 
 
 ## Demo
