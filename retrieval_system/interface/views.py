@@ -23,7 +23,7 @@ from .forms import HelloForm, SelectNodeForm, SelectEdgeForm, SelectSavedQueryFo
 # パスを通す
 current_dir=os.getcwd()
 search_engine_path=f"{current_dir}/interface/retrieval_engine_module"
-upper_dir=current_dir[:current_dir.rfind("/similarity_retrieval_system/")]
+upper_dir=current_dir[:current_dir.rfind("/Similarity_Search_on_Computational_Notebooks/")]
 flg_loading=False
 if os.path.exists(f"{upper_dir}/juneau_copy"):
     juneau_file_path=f"{upper_dir}/juneau_copy"
@@ -1011,7 +1011,7 @@ def searching_top_k_notebooks(wm, w_c, w_v, w_l, w_d, k, flg_chk_invalid_by_work
 
 
 def create_jupyter_url(jupyter_notebook_localhost_number, nb_name):
-    created_url = f"http://localhost:{jupyter_notebook_localhost_number}/tree/data/{nb_name}"
+    created_url = f"http://localhost:{jupyter_notebook_localhost_number}/tree/notebooks_data/{nb_name}"
     return created_url
 
 def arrange_result_dict_for_html(jupyter_notebook_localhost_number, top_k_result, dict_nb_name_and_cleaned_nb_name):
