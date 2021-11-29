@@ -1,6 +1,8 @@
+[English](README.md)
+
 # 計算ノートブックの類似検索
 
-![the interface](retrieval_system/images/screenshot1.png "screenshot1")
+![the interface](images/screenshot1.png "screenshot1")
 
 
 ## デモ
@@ -14,8 +16,10 @@
 ## システムの構成要素
 
 * DBMS: PostgreSQL, Neo4j, SQLite
+
 * Jupyter Notebook
-* *[Juneau](https://github.com/juneau-project/juneau.git)
+
+* [Juneau](https://github.com/juneau-project/juneau.git)
 
 Juneauは計算ノートブックのグラフ化や類似度計算に利用しています．
 
@@ -27,7 +31,7 @@ Juneauは計算ノートブックのグラフ化や類似度計算に利用し�
 git clone https://github.com/OnizukaLab/Similarity_Search_on_Computational_Notebooks.git
 ```
 
-以下を実行し，ディレクトリSimilarity_Search_on_Computational_Notebooksと同じ階層にJuneauをクローンします．
+以下を実行し，ディレクトリSimilarity_Search_on_Computational_Notebooks/と同じ階層にJuneauをクローンします．
 
 ```
 git clone https://github.com/juneau-project/juneau.git
@@ -37,7 +41,7 @@ git clone https://github.com/juneau-project/juneau.git
 
 .
 
-├── Similarity_Search_on_Computational_Notebooks
+├── Similarity_Search_on_Computational_Notebooks/
 
 │   ├── README.md
 
@@ -45,42 +49,48 @@ git clone https://github.com/juneau-project/juneau.git
 
 │   ├── notebooks_data.zip
 
-│   └── retrieval_system
+│   └── retrieval_system/
 
 │       ├── manage.py
 
-│       ├──interface
+│       ├──interface/
 
-│       └──retrieval_system
+│       └──retrieval_system/
 
-└── juneau
+├── juneau/
 
+└── notebooks_data/
 
 data.zipはNeo4Jのデータ，notebooks_data.zipは.ipynbフォーマットのファイルが入っています．
 
+data.zipをNeo4Jのデータパスに解凍します．notebooks_data.zipは解凍し，ディレクトリnotebooks_data/をSimilarity_Search_on_Computational_Notebooks/と同じ階層に置きます．
 
 
+## 検索Webアプリケーションの起動
 
-## Start the web interface
+あらかじめ，PostgreSQLとNeo4Jを起動しておきます．
 
-Start PostgreSQL and Neo4J with the databases that have transformed computational notebooks.
-
-Then start Jupyter Notebook on port 8888 by running the following command:
+また，以下のようにJupyter Notebookをポート8888で起動します．
 
 ```
 jupyter notebook --port 8888
 ```
 
-
-To start the web interface, go to the "similarity_retrieval_system/retrieval_system" directory and run the following command:
+ディレクトリsimilarity_retrieval_system/retrieval_system/に移動し，以下のコマンドを実行してサーバを起動します．
 
 ```
-python manage.py runserver
+python manage.py runserver <port>
 ```
 
-You can access the `localhost:8000` and you can use the interface.
+http://127.0.0.1:<port>/interface/
+でインタフェースにアクセスできます．
 
-If you want to change the server's port, this command starts the server on port 8080:
+たとえばポートを8080にする場合は，
+
 ```
 python manage.py runserver 8080
 ```
+
+で起動し，
+http://127.0.0.1:8080/interface/
+にアクセスします．
