@@ -16,6 +16,7 @@
 Module to store a table's provenance.
 
 TODO:calc_v_microbenchmark["load"]を廃止．
+TODO:コード類似度計算をcode_similarityに統一．
 """
 
 import logging
@@ -41,6 +42,7 @@ from juneau.utils.funclister import FuncLister
 from juneau.db.table_db import generate_graph, pre_vars
 from juneau.search.search_prov_code import ProvenanceSearch
 from mymodule.code_relatedness import CodeRelatedness
+from mymodule.code_similarity import CodeSimilarity
 from juneau.db.schemamapping import SchemaMapping
 #from lib import CodeComparer
 
@@ -2957,8 +2959,12 @@ class WorkflowMatching:
         codeN=code_table_B[code_table_B["cell_id"]==n2_real_cell_id]["cell_code"].values
         codeN="".join(list(codeN))
 
-        #if self.calc_code_sim_method=="jaccard":
-        sim=self.class_code_relatedness.calc_code_rel_by_jaccard_index(codeQ, codeN)
+        if self.calc_code_sim_method=="jaccard":
+            sim=self.class_code_relatedness.calc_code_rel_by_jaccard_index(codeQ, codeN)
+        elif self.calc_code_sim_method=="levenshtein":
+            sim=CodeSimilarity.code_sim_based_on_levenshtein_dist(codeQ, codeN)
+        else:
+            sim=self.class_code_relatedness.calc_code_rel_by_jaccard_index(codeQ, codeN)
 
         if self.flg_running_faster["flg_caching"]:
             self.calculated_sim[(nodenameQ, nodenameN)]=sim
@@ -4460,6 +4466,45 @@ class WorkflowMatching:
                 visited_n_q.append(sorted_list[i][0][0])
                 self.nb_score[nb_name]+=sorted_list[i][1]
 
+    def existing_method_calc_table_sim_using_juneau(self, k_juneau:int=20) -> dict:
+        """
+        1と2は結果を戻り値にするかself.nb_scoreに格納するかの違い．
+        """
+        nb_score={}
+        sim_list={}
+        n_q_num=len(self.query_table)
+        #node_db_list=list(self.G.nodes)
+
+        self.flg_juneau=True
+        for tnameA, tableA in self.query_table.items():
+            #tableA = self.fetch_var_table(nname)
+
+            rtables=self.search_similar_tables_threshold2_with_scores(query=tableA, beta=0.1, k=k_juneau, theta=10, thres_key_cache=0.2, thres_key_prune=0.9, tflag=True)
+            for tname, _, score in rtables:
+                tgroup = self.table_group[tname]
+                for tnameB, tgroupB in self.table_group.items():
+                    if tgroup == tgroupB:
+                        nb_name=self.attr_of_db_nb_name[tnameB]
+                        if nb_name not in self.valid_nb_name:
+                            continue
+                        if nb_name not in sim_list:
+                            sim_list[nb_name]={}
+                            nb_score[nb_name]=0
+                        sim_list[nb_name][(tnameA, tnameB)]=score
+        self.sim_list=sim_list
+        for nb_name in sim_list:
+            if n_q_num > len(sim_list[nb_name]):
+                nb_score[nb_name]=0
+                continue
+            sorted_list=sorted(sim_list[nb_name].items(), key=lambda d: d[1], reverse=True)
+            visited_n_q=[]
+            for i in range(min(n_q_num, len(sorted_list))):
+                if sorted_list[i][0][0] in visited_n_q:
+                    continue
+                visited_n_q.append(sorted_list[i][0][0])
+                nb_score[nb_name]+=sorted_list[i][1]
+        return nb_score
+
     def existing_method_calc_table_sim_particular_nb(self, nb_name:str):
         # 2021/01/20修正
         #calc_var_start_time = timeit.default_timer()
@@ -4515,6 +4560,99 @@ class WorkflowMatching:
         return q_table_size_sum, db_table_size_sum, valid_db_count, invalid_db_count
 
     def existing_method_calc_code_sim(self):
+        """
+        Calculate code similarity for the code-based search method (C).
+        セルを頭から結合したソースコードだけをみてtop-kのスコアにする．(self.nb_scoreにセット)
+        """
+        class_code_relatedness=self.class_code_relatedness
+
+        # get query source code
+        query_code=self.combining_query_code()
+
+
+        for nb_name in self.valid_nb_name:
+            # get db nodebook source code
+            db_code_table=self.fetch_source_code_table(nb_name)
+            db_code_list=db_code_table["cell_code"].values
+            # ********* oldに対して追加点 ***********
+            db_code_list2=[]
+            for code in db_code_list:
+                row_list=code.split("\n")
+                for row in row_list:
+                    if "#" in row:
+                        row=row[:row.index("#")]
+                        if row=="":
+                            continue
+                        db_code_list2.append(row)
+                    else:
+                        db_code_list2.append(row)
+            if len(db_code_list2)==0:
+                self.nb_score[nb_name]=0
+                continue
+            # ********* 上記，追加点 ***********
+            db_code="\n".join(db_code_list2) # oldに対して変更点 db_code_list -> db_code_list2
+            while "\n\n" in db_code:
+                db_code=db_code.replace("\n\n", "\n")
+            calc_code_start_time = timeit.default_timer()
+            if self.calc_code_sim_method=="jaccard":
+                sim=self.class_code_relatedness.calc_code_rel_by_jaccard_index(query_code, db_code)
+            elif self.calc_code_sim_method=="levenshtein":
+                sim=CodeSimilarity.code_sim_based_on_levenshtein_dist(query_code, db_code)
+            else:
+                sim=self.class_code_relatedness.calc_code_rel_by_jaccard_index(query_code, db_code)
+            #sim=class_code_relatedness.calc_code_rel_by_jaccard_index(query_code, db_code)
+            calc_code_end_time = timeit.default_timer()
+            self.each_calc_time_sum["Cell"]+=calc_code_end_time-calc_code_start_time
+            self.nb_score[nb_name]=sim
+
+
+    def existing_method_calc_code_sim2(self):
+        """
+        1と2は結果を戻り値にするかself.nb_scoreに格納するかの違い．
+        """
+        nb_score={}
+        # get query source code
+        query_code=self.combining_query_code()
+
+
+        for nb_name in self.valid_nb_name:
+            # get db nodebook source code
+            db_code_table=self.fetch_source_code_table(nb_name)
+            db_code_list=db_code_table["cell_code"].values
+            # ********* oldに対して追加点 ***********
+            db_code_list2=[]
+            for code in db_code_list:
+                row_list=code.split("\n")
+                for row in row_list:
+                    if "#" in row:
+                        row=row[:row.index("#")]
+                        if row=="":
+                            continue
+                        db_code_list2.append(row)
+                    else:
+                        db_code_list2.append(row)
+            if len(db_code_list2)==0:
+                nb_score[nb_name]=0
+                continue
+            # ********* 上記，追加点 ***********
+            db_code="\n".join(db_code_list2) # oldに対して変更点 db_code_list -> db_code_list2
+            while "\n\n" in db_code:
+                db_code=db_code.replace("\n\n", "\n")
+            calc_code_start_time = timeit.default_timer()
+            if self.calc_code_sim_method=="jaccard":
+                sim=self.class_code_relatedness.calc_code_rel_by_jaccard_index(query_code, db_code)
+            elif self.calc_code_sim_method=="levenshtein":
+                sim=CodeSimilarity.code_sim_based_on_levenshtein_dist(query_code, db_code)
+            else:
+                sim=self.class_code_relatedness.calc_code_rel_by_jaccard_index(query_code, db_code)
+            #sim=class_code_relatedness.calc_code_rel_by_jaccard_index(query_code, db_code)
+            calc_code_end_time = timeit.default_timer()
+            self.each_calc_time_sum["Cell"]+=calc_code_end_time-calc_code_start_time
+            nb_score[nb_name]=sim
+        return nb_score
+
+            
+    def set_based_method_calc_code_sim(self):
         """
         Calculate code similarity for the code-based search method (C).
         セルを頭から結合したソースコードだけをみてtop-kのスコアにする．(self.nb_scoreにセット)
@@ -6645,6 +6783,70 @@ class WorkflowMatching:
                     )
 
 
+    def levenshtein_dist(self, w_c) -> dict:
+        """
+        セルの塊ごとにコードを比較．最も高い類似度のセルのコードとの類似度をクエリの各セルに対し計算し，その合計値をそのノートブックのスコアとする．
+        最後に0以上1以下の値に正規化される．
+        """
+        sim_list={}
+        n_q_num=len(self.query_table)
+        #node_db_list=list(self.G.nodes)
+        node_db_list=self.all_node_list["Cell"]
+        for n_q in self.query_table:
+            sim_list[n_q]={}
+            for n_db in node_db_list:
+                if self.attr_of_db_node_type[n_db] != self.attr_of_q_node_type[n_q]:
+                    continue
+                nb_name=self.attr_of_db_nb_name[n_db]
+                if nb_name not in self.valid_nb_name:
+                    continue
+                calc_code_start_time = timeit.default_timer()
+                sim=CodeSimilarity.code_sim_based_on_levenshtein_dist(n_q, n_db)
+                calc_code_end_time = timeit.default_timer()
+                self.each_calc_time_sum["Cell"]+=calc_code_end_time-calc_code_start_time
+                if nb_name not in sim_list:
+                    sim_list[n_q][nb_name]=0
+                sim_list[n_q][nb_name]=max(sim_list[n_q][nb_name], sim)
 
+        n_q_num=len(self.query_table)
+        notebooks_code_sim={}
+        for nb_name in self.valid_nb_name:
+            notebooks_code_sim[nb_name]=0
+            for n_q in self.query_table:
+                notebooks_code_sim[nb_name]+=sim_list[n_q][nb_name]
+            notebooks_code_sim[nb_name]*=w_c
+            notebooks_code_sim[nb_name]/=n_q_num
+        return notebooks_code_sim
+
+
+    def existing_method_sum_using_juneau(self):
+        """
+        Set-based search method w/o optimization.
+        Save computational notebook similarity in self.nb_score.
+
+        ノード数による調整あり．
+        """
+        self.init_each_calc_time_sum()
+        self.nb_score={}
+        table_q_num=len(self.query_table)
+        code_q_num=len(self.query_cell_code)
+        nb_score_according_to_table_sim={}
+        nb_score_according_to_code_sim={}
+
+        if self.w_v!=0:
+            nb_score_according_to_table_sim=self.existing_method_calc_table_sim_using_juneau()
+        if self.w_c!=0:
+            nb_score_according_to_code_sim=self.existing_method_calc_code_sim2()
+
+        for nb_name in self.valid_nb_name:
+            if nb_name not in nb_score_according_to_table_sim:
+                nb_score_according_to_table_sim[nb_name]=0
+            if nb_name not in nb_score_according_to_code_sim:
+                nb_score_according_to_code_sim[nb_name]=0
+            self.nb_score[nb_name]=0
+            if table_q_num!=0:
+                self.nb_score[nb_name] += nb_score_according_to_table_sim[nb_name] * self.w_v / table_q_num
+            if code_q_num!=0:
+                self.nb_score[nb_name] += nb_score_according_to_code_sim[nb_name] * self.w_c / code_q_num
 
 
