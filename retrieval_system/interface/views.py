@@ -15,9 +15,12 @@ from django.views import generic
 from django.utils import timezone
 
 from .models import QueryLibrary, QueryNode, QueryEdge, QueryJson
-from .forms import HelloForm, SelectNodeForm, SelectEdgeForm, SelectSavedQueryForm, SelectParentNodeForm, UploadQueryFileForm, UploadTableDataFileForm
+from .forms import HelloForm, SelectNodeForm, SelectEdgeForm, SelectSavedQueryForm, SelectParentNodeForm, UploadQueryFileForm, UploadTableDataFileForm, SelectTypeForm
 
 
+# ***** システム起動時に実行される - ここから *****
+
+# パスを通す
 current_dir=os.getcwd()
 search_engine_path=f"{current_dir}/interface/retrieval_engine_module"
 upper_dir=current_dir[:current_dir.rfind("/similarity_retrieval_system/")]
@@ -35,9 +38,11 @@ sys.path.append(search_engine_path)
 sys.path.append(f"{search_engine_path}/mymodule")
 #sys.path.append(juneau_file_path)
 
+# 各種必要なクラスをインポートする
+# Juneauのインポート
 from juneau.db.table_db import connect2db_engine, connect2gdb
 from juneau.config import config
-
+# 提案検索手法インポート
 from workflow_matching import WorkflowMatching
 #from mymodule.workflow_matching import WorkflowMatching
 
@@ -48,8 +53,9 @@ else:
 
 # Global variable
 G_in_this_nb=None
+# Jupyter Notebookを起動時のポート設定
 jupyter_notebook_localhost_number=8888
-flg_get_db_graph = True # For development. 検索部分を動かすかどうか. 開発用
+flg_get_db_graph = True # For development. 検索部分を動かすかどうか. 
 
 
 # ***** initialization *****
@@ -124,6 +130,8 @@ data_weight=1
 library_weight=1
 output_weight=1
 k=10
+
+# ***** システム起動時に実行される - ここまで *****
 
 
 """
@@ -217,6 +225,9 @@ def form_old(request, *args, **kwargs):
     return render(request, 'interface/querygraph.html', {'node_object_list': node_object_list, 'node_id_to_node_name': node_id_to_node_name, "debug_data":debug_data})
 
 def index(request, *args, **kwargs):
+    """
+    最初にアクセスする，メインページ．
+    """
     logging.info(f"Loaded \'index\' page.")
 
     #wm = WorkflowMatching(psql_engine, graph_db, valid_nb_name_file_path=valid_nb_name_file_path)
@@ -242,7 +253,7 @@ def index(request, *args, **kwargs):
     msg['form_setting_node'] = SelectNodeForm()
     msg['form_setting_parent_node'] = SelectParentNodeForm()
     msg['form_delete_edge'] = SelectEdgeForm()
-    #msg['form_setting_type'] = SelectTypeForm()
+    msg['form_setting_type'] = SelectTypeForm()
     msg['form_setting_query'] = SelectSavedQueryForm()
     msg['query_name']=""
     msg["arranged_result"]=""
@@ -276,6 +287,9 @@ def PostExport(request):
     return response
     
 def form(request, *args, **kwargs):
+    """
+    メインページから遷移するページ．このページからもこのページに遷移する．
+    """
     logging.info(f"Loaded \'form\' page.")
 
     request_data=request.POST
@@ -285,12 +299,14 @@ def form(request, *args, **kwargs):
     #デバッグ用
     debug_data=request_data
     #if (request.method == 'POST'):
-    
+
+    #func_loading_button(request_data) 検証後，以下を左に置き換え．
     if "loading_button" in request_data:
         json_file = QueryJson.objects.filter(query_name=request_data["selected_query"])[0].query_contents
         replace_all_using_json_log(json_file)
     else:
         pass
+
 
     if "setting_button" in request_data:
         if request_data["setting_button"] == "Reset":
@@ -337,9 +353,16 @@ def form(request, *args, **kwargs):
                     new_edge = QueryEdge(parent_node_id=parent_node_id, successor_node_id=node_id)
                     new_edge.save()
             if "libraries_contents" in request_data:
-                libraries_contents = request_data["libraries_contents"]
-                extracted_libraries_contents = extract_library_name(libraries_contents)
-                save_libraries(extracted_libraries_contents)
+                if "add_library_mode" in request_data:
+                    logging.info("add_library_mode in request_data")
+                    libraries_contents = request_data["libraries_contents"]
+                    extracted_libraries_contents = extract_library_name(libraries_contents, request_data["add_library_mode"])
+                    save_libraries(extracted_libraries_contents)
+                else:
+                    logging.err("err: 'add_library_mode' is null!")
+                    libraries_contents = request_data["libraries_contents"]
+                    extracted_libraries_contents = extract_library_name(libraries_contents, "mode_codes")
+                    save_libraries(extracted_libraries_contents)
 
         if request_data["setting_button"] == "Add":
             try:
@@ -395,7 +418,6 @@ def form(request, *args, **kwargs):
         arranged_result_json=""
         send_node_object_list=arrange_node_object_list(QueryNode.objects.all())
 
-
         
     edges=arrange_edge_object_list(QueryEdge.objects.all())
 
@@ -413,18 +435,19 @@ def form(request, *args, **kwargs):
         "uploadfile": uploadfile,
         }
         
-    msg['form_setting_node'] = SelectNodeForm().append_choice()
-    msg['form_setting_parent_node'] = SelectParentNodeForm().append_choice()
-    msg['form_delete_edge'] = SelectEdgeForm().append_choice()
-    #msg['form_setting_type'] = SelectTypeForm().append_choice()
-    msg['form_setting_query'] = SelectSavedQueryForm().append_choice()
+    msg['form_setting_node'] = SelectNodeForm()#.append_choice()
+    msg['form_setting_parent_node'] = SelectParentNodeForm()#.append_choice()
+    msg['form_delete_edge'] = SelectEdgeForm()#.append_choice()
+    msg['form_setting_type'] = SelectTypeForm()
+    msg['form_setting_query'] = SelectSavedQueryForm()#.append_choice()
     msg['query_name']=""
     msg['err_msg'] = err_msg
     msg["arranged_result"]=arranged_result
     libraries_list=[]
     for item in QueryLibrary.objects.all():
         libraries_list.append(item.library_name)
-    msg["libraries_list"]=json.dumps(libraries_list)
+    #msg["libraries_list"]=json.dumps(libraries_list)
+    msg["libraries_list"]="<br/>".join(libraries_list)
     if search_time == 0:
         msg["search_time"]=""
     else:
@@ -760,7 +783,7 @@ def build_QueryGraph(wm):
             output_id+=1
             if "text" not in query_workflow_info["Display_data"]:
                 query_workflow_info["Display_data"]["text"]=0
-            query_workflow_info["Display_data"]+=1
+            query_workflow_info["Display_data"]["text"]+=1
             query_workflow_info["Display_data"]["all"]+=1
         elif node.node_type=="figure_output":
             node_name = f"query_display{output_id}"
@@ -769,7 +792,7 @@ def build_QueryGraph(wm):
             output_id+=1
             if "png" not in query_workflow_info["Display_data"]:
                 query_workflow_info["Display_data"]["png"]=0
-            query_workflow_info["Display_data"]+=1
+            query_workflow_info["Display_data"]["png"]+=1
             query_workflow_info["Display_data"]["all"]+=1
         elif node.node_type=="table_output":
             node_name = f"query_display{output_id}"
@@ -778,7 +801,7 @@ def build_QueryGraph(wm):
             output_id+=1
             if "DataFrame" not in query_workflow_info["Display_data"]:
                 query_workflow_info["Display_data"]["DataFrame"]=0
-            query_workflow_info["Display_data"]+=1
+            query_workflow_info["Display_data"]["DataFrame"]+=1
             query_workflow_info["Display_data"]["all"]+=1
         elif node.node_type=="reachability":
             node_name = f"wildcard_{reachability_id}"
@@ -875,7 +898,10 @@ def dump_to_json(QueryNode_object_list, QueryEdge_object_list, QueryLibrary_obje
         list2json["querylibrary"].append({"library_name": str(QueryLibrary_object.library_name)})
     return json.dumps(list2json)
 
-def replace_all_using_json_log(json_file):
+def replace_all_using_json_log(json_file:str):
+    """
+    json形式のクエリを読み込む．
+    """
     delete_all()
     dictionary = json.loads(json_file)
     for item in dictionary["querynode"]:
@@ -1017,8 +1043,16 @@ def make_test_formset(request):
         # formset = TestFormSet(initial=[{'title':'abc', 'date': '2019-01-01'},])
     return render(request, 'interface/form1.html', {'formset': formset})
 
+def extract_library_name(libraries_contents, add_library_mode):
+    """
+    a wrapper func.
+    """
+    if add_library_mode == "mode_codes":
+        return extract_library_name_modeA(libraries_contents)
+    elif add_library_mode == "mode_librarynames":
+        return extract_library_name_modeB(libraries_contents)
 
-def extract_library_name(string_library):
+def extract_library_name_modeA(string_library):
     library_list=[]
     string_library = string_library.replace("\r", "")
     while("\n\n" in string_library):
@@ -1050,6 +1084,25 @@ def extract_library_name(string_library):
 
     return library_list
 
+def extract_library_name_modeB(string_library):
+    library_list=[]
+    string_library = string_library.replace("\r", "")
+    while("\n\n" in string_library):
+        string_library = string_library.replace("\n\n", "\n")
+
+    rows = string_library.split("\n")
+    for row in rows:
+        row = row.replace(" ", "")
+
+        if "," in row:
+            r_list=row.split(",")
+            for r in r_list:
+                library_list.append(r)
+        else:
+            library_list.append(row)
+
+    return library_list
+
 def save_libraries(libraries_list):
     for lib_name in libraries_list:
         if QueryLibrary.objects.filter(library_name=lib_name).exists():
@@ -1058,6 +1111,12 @@ def save_libraries(libraries_list):
         q.save()
 
 
+def func_loading_button(request_data):
+    if "loading_button" in request_data:
+        json_file = QueryJson.objects.filter(query_name=request_data["selected_query"])[0].query_contents
+        replace_all_using_json_log(json_file)
+    else:
+        pass
 
 
 

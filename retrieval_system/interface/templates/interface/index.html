@@ -21,7 +21,7 @@
 <div class="hero-header">
     <div class="wrap">
         <h1 class="hero-header_visual">
-            <p>Similarity Search for Jupyter Notebook</p>
+            <p>Jupyter Notebook Similarity Search System</p>
         </h1>
     </div>
 </div>
@@ -178,7 +178,11 @@
                                     <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
                                         {% csrf_token %}
                                         {{libraries_list}}
-                                        <p>Copy and paste source code with importing library</p>
+                                        <label for="add_library_mode"></label>
+                                        <select id="add_library_mode">
+                                        <option value="mode_codes" selected>Copy and paste source code with importing library</option>
+                                        <option value="mode_librarynames">Input library names separated by comma or new line</option>
+                                        </select>
                                         <textarea name="libraries_contents" id="libraries_contents" value="" cols="50" rows="10"></textarea>
                                         <br/>
                                         <input type="submit" name="setting_button" value="Set">
@@ -201,7 +205,7 @@
                                         <label>node id</label>
                                         <input type="number" min="0" max="100" name="input_node_id" value="0" id="add_or_change_input">
                                         {{ form_setting_type.as_p }}
-                                        <br/>property:
+                                        <br/>contents:
                                         <br/>
                                         <textarea name="input_node_contents" id="input_node_contents" value="" cols="50" rows="10"></textarea>
                                         <br/>
@@ -419,7 +423,12 @@ var setCurrentValue6 = (val) => {
     currentValueElem6.innerText = val;
 }
 var rangeOnChange6 = (e) =>{
-  setCurrentValue6(e.target.value);
+    setCurrentValue6(e.target.value);
+    /*
+    setTimeout(function(){
+        setCurrentValue6(e.target.value);
+    },500);
+    */
 }
 inputElem6.addEventListener('input', rangeOnChange6);
 setCurrentValue6(inputElem6.value);
@@ -428,23 +437,139 @@ setCurrentValue6(inputElem6.value);
 
 
 
-
-
-
-const TOOLTIP_MAX_TEXT_LENGTH=300;
+const TOOLTIP_MAX_TEXT_LENGTH=500;
 var tooltip = d3.select("body").append("div").attr("class", "tooltip");
-// nodeの半径
-var node_r = 25;
-edge_len = 100;
-// nodeの色設定
-var node_color_fill = "#adeed1";
-var node_color_stroke = "#7ec5b3";
+var tooltip_mode="normal" // normal or simple
+// *** nodeの見た目の設定 ***
+var node_r = 25; // ノードの半径
+edge_len = 100; // 辺の長さ
+// *** nodeの色設定 ***
+//var node_color_fill = "#adeed1";
+//var node_color_stroke = "#7ec5b3";
+var output_list=["text_output", "figure_output", "table_output"]
+var nodetype2nodecolor = {
+    "code":"#FA9950",
+    "data":"#7793D4",
+    "text_output":"#71AE48",
+    "figure_output":"#71AE48",
+    "table_output":"#71AE48",
+    "reachability":"#002060",
+};
+var nodetype2nodestrokecolor1 = { //薄い色
+    "code":"#FFD8B8",
+    "data":"#CAD6F5",
+    "text_output":"#C5EAAB",
+    "figure_output":"#C5EAAB",
+    "table_output":"#C5EAAB",
+    "reachability":"#8895AE",
+};
+var nodetype2nodestrokecolor2 = { //濃い色
+    "code":"#D36C15",
+    "data":"#5577CF",
+    "text_output":"#579829",
+    "figure_output":"#579829",
+    "table_output":"#579829",
+    "reachability":"#004BE0",
+};
+var edge_color = "#4472C4";
 var node_stroke_width = 4;
+var text_color="white";
+
+// toolkit表示のキャッシュ
+// TODO: ノードの内容を削除したり変更した場合に正常に動作するか確認
+var cache_tooltip_text = {"normal":{}, "simple":{}} // {mode: {node id: text}}
+
+
 
 drawgraph()
 
+
+function get_tooltip_contents_forDevelop(ind){
+    // 開発用
+    var tooltip_contents = "node id : ";
+    tooltip_contents += JSON.stringify(node_object_list[ind].node_id);
+    tooltip_contents += "<br>node type : ";
+    tooltip_contents += JSON.stringify(node_object_list[ind].node_type);
+    tooltip_contents += "<br>node contents : ";
+    tooltip_contents += JSON.stringify(node_object_list[ind].node_contents);
+    tooltip_contents += "<br>edges : ";
+    tooltip_contents += JSON.stringify(edge_list);
+    if (tooltip_contents.length > TOOLTIP_MAX_TEXT_LENGTH){
+        tooltip_contents = tooltip_contents.substr( 0, TOOLTIP_MAX_TEXT_LENGTH );
+        tooltip_contents += "...";
+    }
+    return tooltip_contents;
+}
+
+function get_tooltip_contents(ind){
+    if (tooltip_mode=="normal"){
+        return get_tooltip_contents_normal(ind);
+    }
+    if (tooltip_mode=="simple"){
+        return get_tooltip_contents_simple(ind);
+    }
+}
+
+function get_tooltip_contents_normal(ind){
+    if (ind in cache_tooltip_text["normal"]){ //キャッシュがあるとき
+        return cache_tooltip_text["normal"][ind];
+    }
+    var tooltip_contents = "<span class='tooltip_wrap1'>node id :</span>";
+    tooltip_contents += JSON.stringify(node_object_list[ind].node_id);
+
+    tooltip_contents += "<br/>";
+    tooltip_contents += "<span class='tooltip_wrap1'>type :</span>";
+    if (output_list.includes(node_object_list[ind].node_type)){
+        tooltip_contents += "output";
+        tooltip_contents += "<br/>";
+        tooltip_contents += "<span class='tooltip_wrap1'>contents :</span><span class='tooltip_wrap2'>";
+        tooltip_contents += node_object_list[ind].node_type;
+    }else{
+        tooltip_contents += node_object_list[ind].node_type;
+        tooltip_contents += "<br/>";
+        tooltip_contents += "<span class='tooltip_wrap1'>contents :</span><span class='tooltip_wrap2'>";
+        var contents = node_object_list[ind].node_contents;
+        while(contents.match("\n")){
+            contents = contents.replace("\n", "<br/>");
+        }
+        tooltip_contents += contents;
+        tooltip_contents += "</span>";
+    }
+
+    if (tooltip_contents.length > TOOLTIP_MAX_TEXT_LENGTH){
+        tooltip_contents = tooltip_contents.substr( 0, TOOLTIP_MAX_TEXT_LENGTH );
+        tooltip_contents += "...";
+    }
+    cache_tooltip_text["normal"][ind] = tooltip_contents
+    return tooltip_contents;
+}
+
+function get_tooltip_contents_simple(ind){
+    // get_tooltip_contentsと違う点： node id, node typeを非表示
+    if (ind in cache_tooltip_text["simple"]){ //キャッシュがあるとき
+        return cache_tooltip_text["simple"][ind];
+    }
+    var tooltip_contents = "<span class='tooltip_wrap2'>";
+    if (output_list.includes(node_object_list[ind].node_type)){
+        tooltip_contents += node_object_list[ind].node_type;
+    }else{
+        var contents = node_object_list[ind].node_contents;
+        while(contents.match("\n")){
+            contents = contents.replace("\n", "<br/>");
+        }
+        tooltip_contents += contents;
+        tooltip_contents += "</span>";
+    }
+
+    if (tooltip_contents.length > TOOLTIP_MAX_TEXT_LENGTH){
+        tooltip_contents = tooltip_contents.substr( 0, TOOLTIP_MAX_TEXT_LENGTH );
+        tooltip_contents += "...";
+    }
+    cache_tooltip_text["simple"][ind] = tooltip_contents
+    return tooltip_contents;
+}
+
 function drawgraph(){
-    // sample
     // 参考1: https://qiita.com/daxanya1/items/734e65a7ca58bbe2a98c
     // 参考2: https://wizardace.com/d3-forcesimulation-onlynode/
 
@@ -459,7 +584,8 @@ function drawgraph(){
             "index": node_object_list[i].node_id,
             "x": width * Math.random(),
             "y": height * Math.random(),
-            "r": node_r
+            "r": node_r,
+            "nodetype": node_object_list[i].node_type,
         });
         nodeid2ind[node_object_list[i].node_id]=i
     }
@@ -487,7 +613,7 @@ function drawgraph(){
     .attr("orient", "auto")
     .append("path")
     .attr("d", "M 0 0 12 6 0 12 3 6")
-    .style("fill", "black");
+    .style("fill", edge_color);
 
     // 辺
     var link = d3.select("svg")
@@ -496,7 +622,7 @@ function drawgraph(){
     .enter()
     .append("line")
     .attr("stroke-width", 1)
-    .attr("stroke", "black")
+    .attr("stroke", edge_color)
     .attr("marker-end", "url(#triangle)");
 
     // ノード
@@ -507,33 +633,19 @@ function drawgraph(){
     .enter()
     .append("circle")
     .attr("r", function(d) { return d.r })
-    .style("fill", node_color_fill)
-    .attr("stroke", node_color_stroke)
+    .style("fill", function(d) { return nodetype2nodecolor[d.nodetype] }) // 元 .style("fill", node_color_fill)
+    .attr("stroke", function(d) { return nodetype2nodestrokecolor1[d.nodetype] }) //.attr("stroke", node_color_stroke)
     .style("stroke-width", node_stroke_width)
     .on("mouseover", function(d) {
         // tooltip_contentsはなんども呼び出すのであらかじめvar node外でリスト等に格納する方が高速になりそう．
         var ind = d.index;
-        var tooltip_contents = "<span class='tooltip_wrap1'>node id :</span>";
-        tooltip_contents += JSON.stringify(node_object_list[ind].node_id);
-        tooltip_contents += "<br><span class='tooltip_wrap1'>type :</span>";
-        tooltip_contents += node_object_list[ind].node_type;
-        tooltip_contents += "<br><span class='tooltip_wrap1'>property :</span><span class='tooltip_wrap2'>";
-        var contents = node_object_list[ind].node_contents;
-        while(contents.match("\n")){
-            contents = contents.replace("\n", "<br/>");
-        }
-        tooltip_contents += contents;
-        tooltip_contents += "</span>";
-        if (tooltip_contents.length > TOOLTIP_MAX_TEXT_LENGTH){
-            tooltip_contents = tooltip_contents.substr( 0, TOOLTIP_MAX_TEXT_LENGTH );
-            tooltip_contents += "...";
-        }
+        var tooltip_contents = get_tooltip_contents(ind);
         tooltip
             .style("visibility", "visible")
             .html(tooltip_contents);
         mouse_flg=0;
         d3.select(this)
-            .attr("stroke", "green");
+            .attr("stroke", function(d) { return nodetype2nodestrokecolor2[d.nodetype] });
         })
     .on("mousemove", function(d) {
         tooltip
@@ -544,23 +656,13 @@ function drawgraph(){
         if(mouse_flg==0){
             tooltip.style("visibility", "hidden");
             d3.select(this)
-                .attr("stroke", node_color_stroke);
+                .attr("stroke", function(d) { return nodetype2nodestrokecolor1[d.nodetype] });
         }
         })
-    .on("mousedown", function(d, i) {
+    .on("mousedown", function(d, i) { //これは無くて良い
         var ind = d.index
-        var tooltip_contents = "node id : ";
-        tooltip_contents += JSON.stringify(node_object_list[ind].node_id);
-        tooltip_contents += "<br>node type : ";
-        tooltip_contents += JSON.stringify(node_object_list[ind].node_type);
-        tooltip_contents += "<br>node contents : ";
-        tooltip_contents += JSON.stringify(node_object_list[ind].node_contents);
-        tooltip_contents += "<br>edges : ";
-        tooltip_contents += JSON.stringify(edge_list);
-        if (tooltip_contents.length > TOOLTIP_MAX_TEXT_LENGTH){
-            tooltip_contents = tooltip_contents.substr( 0, TOOLTIP_MAX_TEXT_LENGTH );
-            tooltip_contents += "...";
-        }
+        var tooltip_contents = get_tooltip_contents(ind);
+        //var tooltip_contents = get_tooltip_contents_forDevelop(ind);
         tooltip
             .style("visibility", "visible")
             .html(tooltip_contents);
@@ -568,7 +670,7 @@ function drawgraph(){
         })
     .on("mouseup", function() { 
         d3.select(this)
-            .attr("stroke", node_color_stroke);
+            .attr("stroke", "black");
         })
     .call(d3.drag()
         .on("start", dragstarted)
@@ -584,7 +686,7 @@ function drawgraph(){
     .append('text')
     .attr('text-anchor', "middle")
     .attr('dy', ".35em")
-    .attr('fill', "black")
+    .attr('fill', text_color)
     .text(function(d, i) { return d.index; });
 
 
@@ -648,6 +750,7 @@ function drawgraph(){
     }
 
 }
+
 </script>
 
 

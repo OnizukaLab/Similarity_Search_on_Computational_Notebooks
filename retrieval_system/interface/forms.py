@@ -53,7 +53,7 @@ class SelectTypeForm(forms.Form):
         ('data', 'data'),
         ('text_output', 'text output'),
         ('figure_output', 'figure output'),
-        ('table_output', 'table_output'),
+        ('table_output', 'table output'),
         ('reachability', 'reachability'),
     ]
     input_node_type = forms.ChoiceField(label='type',choices=data)
