@@ -8,7 +8,7 @@
 
 ## Demo
 
-![Demo1](retrieval_system/images/Demo_gif3.gif "demo1")
+![Demo](retrieval_system/images/Demo_gif3_2.gif "demo")
 
 [Demo1 old version](https://drive.google.com/file/d/1x1yiM8xQkwlJtQmQPgIOiSyN2d3QoUBu/view?usp=sharing)
 
