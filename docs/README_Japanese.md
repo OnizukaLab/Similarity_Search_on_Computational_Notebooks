@@ -1,8 +1,8 @@
-[English](README.md)
+[English](./../README.md)
 
 # 計算ノートブックの類似検索
 
-![the interface](retrieval_system/images/screenshot1.png "screenshot1")
+![the interface](./../retrieval_system/images/screenshot1.png "screenshot1")
 
 
 ## デモ

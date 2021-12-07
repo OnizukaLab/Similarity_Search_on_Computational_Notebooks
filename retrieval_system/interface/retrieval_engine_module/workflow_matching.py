@@ -75,6 +75,7 @@ class WorkflowMatching:
             graph_eng (Graph): py2neoのクラス`Graph`のインスタンス．インスタンス変数graph_dbに格納．
             query (list[Node]): クエリのワークフローグラフ．ラベルは"Cell"がセルノード，"Var"が表形式データのノード，"OneWildcard"は1つのいずれかのノード，"AnyWildcard"は0個以上のいずれかのノード
         """
+        self.calc_code_sim_method="jaccard"
         self.graph_db = graph_eng
         self.postgres_eng = postgres_eng
         self.query_workflow = [] #query_nodeの名前の方がいいかも

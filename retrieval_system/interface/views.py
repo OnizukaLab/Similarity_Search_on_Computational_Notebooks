@@ -111,7 +111,7 @@ def delete_node_safely(node_id):
     err_msg=""
     if QueryEdge.objects.filter(parent_node_id=node_id).exists() or QueryEdge.objects.filter(successor_node_id=node_id).exists():
         logging.error("error: Please delete related edges first.")
-        err_msg = "Error: Selected node has one or more edges. Please delete the edges first."
+        err_msg = "Error: This node has any edges. Please delete the edges first."
     else:
         QueryNode.objects.filter(node_id=node_id).delete()
     return err_msg
@@ -239,6 +239,11 @@ def index(request, *args, **kwargs):
 
     send_node_object_list=arrange_node_object_list(QueryNode.objects.all())
     edges=arrange_edge_object_list(QueryEdge.objects.all())
+    libraries_list=[]
+    for item in QueryLibrary.objects.all():
+        libraries_list.append(item.library_name)
+    #msg["libraries_list"]=json.dumps(libraries_list)
+    #msg["libraries_list"]="\n".join(libraries_list)
     msg={
         'node_object_list': send_node_object_list, 
         'edges':edges, 
@@ -249,16 +254,17 @@ def index(request, *args, **kwargs):
         "library_weight":library_weight, 
         "output_weight":output_weight,
         "uploadfile": uploadfile,
+        "form_setting_node": SelectNodeForm(),
+        "form_setting_parent_node": SelectParentNodeForm(),
+        "form_delete_edge": SelectEdgeForm(),
+        "form_setting_type": SelectTypeForm(),
+        "form_setting_query": SelectSavedQueryForm(),
+        "query_name": "",
+        "arranged_result": "",
+        "form_upload_query": UploadQueryFileForm(),
+        "form_upload_data": UploadTableDataFileForm(),
+        "libraries_list": libraries_list,
         }
-    msg['form_setting_node'] = SelectNodeForm()
-    msg['form_setting_parent_node'] = SelectParentNodeForm()
-    msg['form_delete_edge'] = SelectEdgeForm()
-    msg['form_setting_type'] = SelectTypeForm()
-    msg['form_setting_query'] = SelectSavedQueryForm()
-    msg['query_name']=""
-    msg["arranged_result"]=""
-    msg["form_upload_query"] = UploadQueryFileForm()
-    msg["form_upload_data"] = UploadTableDataFileForm()
     
 
     return render(request, 'interface/index.html', msg)
@@ -422,6 +428,15 @@ def form(request, *args, **kwargs):
     edges=arrange_edge_object_list(QueryEdge.objects.all())
 
 
+    SelectNodeForm().append_choice()
+    SelectParentNodeForm().append_choice()
+    SelectEdgeForm().append_choice()
+    SelectSavedQueryForm().append_choice()
+    libraries_list=[]
+    for item in QueryLibrary.objects.all():
+        libraries_list.append(item.library_name)
+    #msg["libraries_list"]=json.dumps(libraries_list)
+    #msg["libraries_list"]="\n".join(libraries_list)
     msg = {
         'node_object_list': send_node_object_list, 
         'edges':edges,
@@ -433,26 +448,20 @@ def form(request, *args, **kwargs):
         "library_weight":library_weight, 
         "output_weight":output_weight,
         "uploadfile": uploadfile,
+        "form_setting_node": SelectNodeForm(),
+        "form_setting_parent_node": SelectParentNodeForm(),
+        "form_delete_edge": SelectEdgeForm(),
+        "form_setting_type": SelectTypeForm(),
+        "form_setting_query": SelectSavedQueryForm(),
+        "query_name": "",
+        "err_msg": err_msg,
+        "arranged_result": arranged_result,
+        "libraries_list": libraries_list,
+        "search_time": "",
+        "form_upload_query": UploadQueryFileForm(),
         }
-        
-    msg['form_setting_node'] = SelectNodeForm()#.append_choice()
-    msg['form_setting_parent_node'] = SelectParentNodeForm()#.append_choice()
-    msg['form_delete_edge'] = SelectEdgeForm()#.append_choice()
-    msg['form_setting_type'] = SelectTypeForm()
-    msg['form_setting_query'] = SelectSavedQueryForm()#.append_choice()
-    msg['query_name']=""
-    msg['err_msg'] = err_msg
-    msg["arranged_result"]=arranged_result
-    libraries_list=[]
-    for item in QueryLibrary.objects.all():
-        libraries_list.append(item.library_name)
-    #msg["libraries_list"]=json.dumps(libraries_list)
-    msg["libraries_list"]="<br/>".join(libraries_list)
-    if search_time == 0:
-        msg["search_time"]=""
-    else:
+    if search_time != 0:
         msg["search_time"]=f"({round(search_time,1)} sec.)"
-    msg["form_upload_query"] = UploadQueryFileForm()
 
     return render(request, 'interface/index.html', msg)
 
