@@ -1,3 +1,6 @@
+[日本語版](docs/README_Japanese.md)
+
+
 # Similarity Search on Computational notebooks
 
 ![the interface](retrieval_system/images/screenshot1.png "screenshot1")
@@ -5,9 +8,11 @@
 
 ## Demo
 
-[Demo1](https://drive.google.com/file/d/1x1yiM8xQkwlJtQmQPgIOiSyN2d3QoUBu/view?usp=sharing)
+![Demo](retrieval_system/images/Demo_gif3_2.gif "demo")
 
-[Demo2](https://drive.google.com/file/d/19CfahRTEwlbaOSZQLLfiALocrVQ3SNkH/view?usp=sharing)
+[Demo1 old version](https://drive.google.com/file/d/1x1yiM8xQkwlJtQmQPgIOiSyN2d3QoUBu/view?usp=sharing)
+
+[Demo2 old version](https://drive.google.com/file/d/19CfahRTEwlbaOSZQLLfiALocrVQ3SNkH/view?usp=sharing)
 
 
 

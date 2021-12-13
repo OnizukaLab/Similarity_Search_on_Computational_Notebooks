@@ -177,10 +177,12 @@
                                 <div class="answer">
                                     <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
                                         {% csrf_token %}
-                                        {{libraries_list}}
+                                        {% for l in libraries_list %}
+                                            {{l}}<br/>
+                                        {% endfor %}
                                         <label for="add_library_mode"></label>
                                         <select id="add_library_mode">
-                                        <option value="mode_codes" selected>Copy and paste source code with importing library</option>
+                                        <option value="mode_codes" selected>Copy and paste source code importing library</option>
                                         <option value="mode_librarynames">Input library names separated by comma or new line</option>
                                         </select>
                                         <textarea name="libraries_contents" id="libraries_contents" value="" cols="50" rows="10"></textarea>
@@ -432,6 +434,7 @@ var rangeOnChange6 = (e) =>{
 }
 inputElem6.addEventListener('input', rangeOnChange6);
 setCurrentValue6(inputElem6.value);
+
 
 
 
