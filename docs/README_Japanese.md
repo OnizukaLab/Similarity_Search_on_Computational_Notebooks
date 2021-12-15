@@ -1,4 +1,4 @@
-[English](./../README.md)
+[English](/README.md)
 
 # 計算ノートブックの類似検索
 
@@ -6,11 +6,13 @@
 
 ![スクリーンショット](/retrieval_system/images/screenshot1.png "Screenshot")
 
-Jupyter notebookをTop-10検索することができます．検索では，ブラウザインタフェースでクエリを入力し，クエリに類似したJupyter notebookを10件出力します．
+Jupyter notebookのTop-10検索を行う検索システムです．
+
+ブラウザインタフェースでクエリを入力し，クエリに類似したJupyter notebookを10件出力します．
 
 ### デモ
 
-![デモ動画](retrieval_system/images/Demo_gif3_2.gif "Demo(gif)")
+![デモ動画](/retrieval_system/images/Demo_gif3_2.gif "Demo(gif)")
 
 [Demo1(old version)](https://drive.google.com/file/d/1x1yiM8xQkwlJtQmQPgIOiSyN2d3QoUBu/view?usp=sharing)
 
@@ -18,7 +20,7 @@ Jupyter notebookをTop-10検索することができます．検索では，ブ�
 
 ### 評価実験
 
-![評価実験](retrieval_system/images/JupySim_experimental_evaluation.pdf "Experimental evaluation(pdf)")
+![評価実験](/retrieval_system/images/JupySim_experimental_evaluation.pdf "Experimental evaluation(pdf)")
 
 
 ## システムの構成要素
@@ -27,7 +29,7 @@ Jupyter notebookをTop-10検索することができます．検索では，ブ�
 
 * Jupyter Notebook
 
-* [Juneau](https://github.com/juneau-project/juneau.git)
+* 当検索システム
 
 検索前に，あらかじめ加工されたJupyter notebookが保存されている必要があります．
 
@@ -39,55 +41,54 @@ Jupyter notebookをTop-10検索することができます．検索では，ブ�
 git clone https://github.com/OnizukaLab/Similarity_Search_on_Computational_Notebooks.git
 ```
 
-以下を実行し，ディレクトリSimilarity_Search_on_Computational_Notebooks/と同じ階層にJuneauをクローンします．
-
-```
-git clone https://github.com/juneau-project/juneau.git
-```
-
 主要なファイルで構成したファイルツリーを以下に示します．
 
-.
+Similarity_Search_on_Computational_Notebooks/
 
-├── Similarity_Search_on_Computational_Notebooks/
+├── retrieval_system/
 
-│   ├── README.md
+│   ├── manage.py
 
-│   ├── data.zip
-
-│   ├── notebooks_data.zip
+│   ├── interface/
 
 │   └── retrieval_system/
 
-│       ├── manage.py
+└── sample_dataset/
 
-│       ├──interface/
+│   ├── postgres_sample.sql（準備中）
 
-│       └──retrieval_system/
+│   ├── neo4j_sample（準備中）
 
-├── juneau/
+│   ├── data1.zip
 
-└── notebooks_data/
+│   ├── data2.zip
 
+│   └── data3.zip
 
+└── README.md
+
+sample_dataset/postgres_sample.sqlをpostgresに，sample_dataset/neo4jをneo4jにインポートします．
+
+また，notebooks_dataというディレクトリを場所不問で作成し，そこにsample_dataset/以下のzipファイルを解凍したものを入れます．
 
 ## 検索Webアプリケーションの起動
 
-あらかじめ，PostgreSQLとNeo4Jを起動しておきます．
+ディレクトリnotebooks_dataに移動し，以下を指定のポートでそれぞれを起動します．
 
-また，以下のようにJupyter Notebookをポート8888で起動します．
+* PostgreSQL
 
-```
-jupyter notebook --port 8888
-```
+* Neo4J (localhost:7474)
 
-ディレクトリsimilarity_retrieval_system/retrieval_system/に移動し，以下のコマンドを実行してサーバを起動します．
+* Jupyter Notebook (localhost:8888)
+
+ディレクトリSimilarity_Search_on_Computational_Notebooks/retrieval_system/に移動し，以下のコマンドを実行してサーバを起動します．
 
 ```
 python manage.py runserver <port>
 ```
 
 http://127.0.0.1:<port>/interface/
+
 でインタフェースにアクセスできます．
 
 たとえばポートを8080にする場合は，
@@ -97,5 +98,7 @@ python manage.py runserver 8080
 ```
 
 で起動し，
+
 http://127.0.0.1:8080/interface/
+
 にアクセスします．
