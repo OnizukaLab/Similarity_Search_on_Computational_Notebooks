@@ -30,7 +30,7 @@
 
 Jupyter notebooks converted into the particular formats must be stored in Databases.
 
-## Preparation
+## System preparation
 
 Clone this system by running following command:
 
@@ -52,9 +52,7 @@ Similarity_Search_on_Computational_Notebooks/
 
 └── sample_dataset/
 
-│   ├── postgres_sample.sql (in preparation)
-
-│   ├── neo4j_sample (in preparation)
+│   ├── neo4j_sample.zip
 
 │   ├── data1.zip
 
@@ -64,13 +62,17 @@ Similarity_Search_on_Computational_Notebooks/
 
 └── README.md
 
-Import sample_dataset/postgres_sample.sql into PostgreSQL and sample_dataset/neo4j into neo4j, respectively.
+## Dataset preparation
 
-Make a directory notebooks_data, then unzip sample_dataset/ and put '.ipynb' files into notebooks_data.
+* Import [postgres_sample.sql](https://drive.google.com/file/d/1po-5Z5M4JbojbLjSvGkgMIOQK51_afur/view?usp=sharing) into postgres.
+
+* Unzip `sample_dataset/neo4j_sample.zip` and move it into neo4j's data directory (e.g. `/usr/local/var/neo4j/data`).
+
+* Make a directory `notebooks_data`, then unzip zipfiles in `Similarity_Search_on_Computational_Notebooks/sample_dataset/` and put '.ipynb' files into `notebooks_data/`.
 
 ## 検索Webアプリケーションの起動
 
-Move 'notebooks_data' and start followings:
+Navigate to `notebooks_data/` and start followings:
 
 * PostgreSQL
 
@@ -78,7 +80,7 @@ Move 'notebooks_data' and start followings:
 
 * Jupyter Notebook (localhost:8888)
 
-Move 'Similarity_Search_on_Computational_Notebooks/retrieval_system/' and run following command to start our system.
+Navigate to `Similarity_Search_on_Computational_Notebooks/retrieval_system/` and run following command to start our system.
 
 ```
 python manage.py runserver <port>

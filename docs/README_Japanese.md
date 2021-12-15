@@ -33,7 +33,7 @@ Jupyter notebookのTop-10検索を行う検索システムです．
 
 検索前に，あらかじめ加工されたJupyter notebookが保存されている必要があります．
 
-## 準備
+## システムの準備
 
 以下を実行し，本システムをクローンします．
 
@@ -55,9 +55,7 @@ Similarity_Search_on_Computational_Notebooks/
 
 └── sample_dataset/
 
-│   ├── postgres_sample.sql（準備中）
-
-│   ├── neo4j_sample（準備中）
+│   ├── neo4j_sample.zip
 
 │   ├── data1.zip
 
@@ -67,13 +65,17 @@ Similarity_Search_on_Computational_Notebooks/
 
 └── README.md
 
-sample_dataset/postgres_sample.sqlをpostgresに，sample_dataset/neo4jをneo4jにインポートします．
+## データセットの準備
 
-また，notebooks_dataというディレクトリを場所不問で作成し，そこにsample_dataset/以下のzipファイルを解凍したものを入れます．
+* [postgres_sample.sql](https://drive.google.com/file/d/1po-5Z5M4JbojbLjSvGkgMIOQK51_afur/view?usp=sharing)をpostgresにインポートする．
+
+* `sample_dataset/neo4j_sample.zip`を解凍したものをneo4jのデータディレクトリ(e.g. `/usr/local/var/neo4j/data`)に移す．
+
+* `notebooks_data`というディレクトリを場所不問で作成し，そこに`Similarity_Search_on_Computational_Notebooks/sample_dataset/`以下のzipファイルを解凍したものを入れる．
 
 ## 検索Webアプリケーションの起動
 
-ディレクトリnotebooks_dataに移動し，以下を指定のポートでそれぞれを起動します．
+ディレクトリ`notebooks_data`に移動し，以下を指定のポートでそれぞれを起動します．
 
 * PostgreSQL
 
@@ -81,7 +83,7 @@ sample_dataset/postgres_sample.sqlをpostgresに，sample_dataset/neo4jをneo4j�
 
 * Jupyter Notebook (localhost:8888)
 
-ディレクトリSimilarity_Search_on_Computational_Notebooks/retrieval_system/に移動し，以下のコマンドを実行してサーバを起動します．
+ディレクトリ`Similarity_Search_on_Computational_Notebooks/retrieval_system/`に移動し，以下のコマンドを実行してサーバを起動します．
 
 ```
 python manage.py runserver <port>
