@@ -86,17 +86,11 @@ Navigate to `notebooks_data/` and start followings:
 Navigate to `Similarity_Search_on_Computational_Notebooks/retrieval_system/` and run following command to start our system.
 
 ```
-python manage.py runserver <port>
-```
-
-Then use interface by accessing
-http\://127.0.0.1:<port>/interface/ .
-
-For example, if you want use port 8080, run following command:
-
-```
 python manage.py runserver 8080
 ```
 
-and access
+Then use the interface by accessing
+
 http://127.0.0.1:8080/interface/ .
+  
+You can use other port number instead of 8080 if you need.

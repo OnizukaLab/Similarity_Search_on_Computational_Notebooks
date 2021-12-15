@@ -86,21 +86,9 @@ Similarity_Search_on_Computational_Notebooks/
 ディレクトリ`Similarity_Search_on_Computational_Notebooks/retrieval_system/`に移動し，以下のコマンドを実行してサーバを起動します．
 
 ```
-python manage.py runserver <port>
-```
-
-http\://127.0.0.1:<port>/interface/
-  
-でインタフェースにアクセスできます．
-
-たとえばポートを8080にする場合は，
-
-```
 python manage.py runserver 8080
 ```
 
-で起動し，
-
 http://127.0.0.1:8080/interface/
-
-にアクセスします．
+  
+で，インタフェースにアクセスできます．ポート番号は変更可能です．
