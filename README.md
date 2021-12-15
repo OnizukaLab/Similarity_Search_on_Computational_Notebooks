@@ -5,6 +5,9 @@
 
 ![the interface](/retrieval_system/images/screenshot1.png "screenshot1")
 
+This is a search system on Jupyter notebook.
+
+Input a query through a browser interface and output Top-10 similar Jupyter notebook.
 
 ## Demo
 
@@ -17,10 +20,10 @@
 
 ### Experimental evaluation
 
-![Experimental evaluation](/retrieval_system/images/JupySim_experimental_evaluation.pdf "Experimental evaluation(pdf)")
+[Experimental evaluation](/retrieval_system/images/JupySim_experimental_evaluation.pdf "Experimental evaluation(pdf)")
 
 
-## システムの構成要素
+## Components
 
 * DBMS: PostgreSQL, Neo4j, SQLite
 
@@ -70,7 +73,7 @@ Similarity_Search_on_Computational_Notebooks/
 
 * Make a directory `notebooks_data`, then unzip zipfiles in `Similarity_Search_on_Computational_Notebooks/sample_dataset/` and put '.ipynb' files into `notebooks_data/`.
 
-## 検索Webアプリケーションの起動
+## Start the interface
 
 Navigate to `notebooks_data/` and start followings:
 

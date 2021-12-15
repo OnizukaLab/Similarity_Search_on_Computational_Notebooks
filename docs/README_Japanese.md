@@ -20,7 +20,7 @@ Jupyter notebookのTop-10検索を行う検索システムです．
 
 ### 評価実験
 
-![評価実験](/retrieval_system/images/JupySim_experimental_evaluation.pdf "Experimental evaluation(pdf)")
+[評価実験](/retrieval_system/images/JupySim_experimental_evaluation.pdf "Experimental evaluation(pdf)")
 
 
 ## システムの構成要素
