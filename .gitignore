@@ -1,5 +1,7 @@
+.DS_Store
 .DS_Store/
 __pycache__/
 *.pyc
 files_gitignore/
-
+retrieval_system/interface/retrieval_engine_module/juneau_copy/*
+!retrieval_system/interface/retrieval_engine_module/juneau_copy/juneau/

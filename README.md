@@ -1,75 +1,97 @@
-[日本語版](docs/README_Japanese.md)
+[日本語版](/docs/README_Japanese.md)
 
 
 # Similarity Search on Computational notebooks
 
-![the interface](retrieval_system/images/screenshot1.png "screenshot1")
+![the interface](/retrieval_system/images/screenshot1.png "screenshot1")
 
 
 ## Demo
 
-![Demo](retrieval_system/images/Demo_gif3_2.gif "demo")
+![Demo](/retrieval_system/images/Demo_gif3_2.gif "demo")
 
 [Demo1 old version](https://drive.google.com/file/d/1x1yiM8xQkwlJtQmQPgIOiSyN2d3QoUBu/view?usp=sharing)
 
 [Demo2 old version](https://drive.google.com/file/d/19CfahRTEwlbaOSZQLLfiALocrVQ3SNkH/view?usp=sharing)
 
 
+### Experimental evaluation
 
-## The components of our system
+![Experimental evaluation](/retrieval_system/images/JupySim_experimental_evaluation.pdf "Experimental evaluation(pdf)")
 
-Our system uses PostgreSQL and Neo4j as DBMS. Our system also uses Jupyter Notebook to display the search results, and [Juneau](https://github.com/juneau-project/juneau.git) to transform computational notebooks into graphs and compute some similarities. 
 
-Before searching, transformed computational notebooks must be stored into them.
+## システムの構成要素
+
+* DBMS: PostgreSQL, Neo4j, SQLite
+
+* Jupyter Notebook
+
+* This search system
+
+Jupyter notebooks converted into the particular formats must be stored in Databases.
 
 ## Preparation
 
-Make a "similarity_retrieval_system" directory and clone our system into the directory.
-
-Then clone [Juneau](https://github.com/juneau-project/juneau.git) into the same hierarchy to "similarity_retrieval_system" as following directory structure:
-
-.
-
-├── similarity_retrieval_system
-
-│   ├── README.md
-
-│   └── retrieval_system
-
-│       ├── manage.py
-
-│       ├──db.sqlite3
-
-│       ├──interface
-
-│       ├──retrieval_system
-
-│       └──templates
-
-└── juneau
-
-
-## Start the web interface
-
-Start PostgreSQL and Neo4J with the databases that have transformed computational notebooks.
-
-Then start Jupyter Notebook on port 8888 by running the following command:
+Clone this system by running following command:
 
 ```
-jupyter notebook --port 8888
-
+git clone https://github.com/OnizukaLab/Similarity_Search_on_Computational_Notebooks.git
 ```
 
+A file tree consisting of important files is as follows:
 
-To start the web interface, go to the "similarity_retrieval_system/retrieval_system" directory and run the following command:
+Similarity_Search_on_Computational_Notebooks/
+
+├── retrieval_system/
+
+│   ├── manage.py
+
+│   ├── interface/
+
+│   └── retrieval_system/
+
+└── sample_dataset/
+
+│   ├── postgres_sample.sql (in preparation)
+
+│   ├── neo4j_sample (in preparation)
+
+│   ├── data1.zip
+
+│   ├── data2.zip
+
+│   └── data3.zip
+
+└── README.md
+
+Import sample_dataset/postgres_sample.sql into PostgreSQL and sample_dataset/neo4j into neo4j, respectively.
+
+Make a directory notebooks_data, then unzip sample_dataset/ and put '.ipynb' files into notebooks_data.
+
+## 検索Webアプリケーションの起動
+
+Move 'notebooks_data' and start followings:
+
+* PostgreSQL
+
+* Neo4J (localhost:7474)
+
+* Jupyter Notebook (localhost:8888)
+
+Move 'Similarity_Search_on_Computational_Notebooks/retrieval_system/' and run following command to start our system.
 
 ```
-python manage.py runserver
+python manage.py runserver <port>
 ```
 
-You can access the `localhost:8000` and you can use the interface.
+Then use interface by accessing
+http://127.0.0.1:<port>/interface/ .
 
-If you want to change the server's port, this command starts the server on port 8080:
+For example, if you want use port 8080, run following command:
+
 ```
 python manage.py runserver 8080
 ```
+
+and access
+http://127.0.0.1:8080/interface/ .

@@ -29,6 +29,10 @@ if os.path.exists(f"{upper_dir}/juneau_copy"):
     juneau_file_path=f"{upper_dir}/juneau_copy"
     flg_loading=True
     sys.path.append(juneau_file_path)
+elif os.path.exists(f"{current_dir}/interface/retrieval_engine_module/juneau_copy"):
+    juneau_file_path=f"{current_dir}/interface/retrieval_engine_module/juneau_copy"
+    flg_loading=True
+    sys.path.append(juneau_file_path)
 elif os.path.exists(f"{upper_dir}/juneau"):
     juneau_file_path=f"{upper_dir}/juneau" 
     flg_loading=True
