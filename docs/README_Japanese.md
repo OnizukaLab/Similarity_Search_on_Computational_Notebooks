@@ -2,15 +2,23 @@
 
 # 計算ノートブックの類似検索
 
-![the interface](./../retrieval_system/images/screenshot1.png "screenshot1")
+## 概要
 
+![スクリーンショット](/retrieval_system/images/screenshot1.png "Screenshot")
 
-## デモ
+Jupyter notebookをTop-10検索することができます．検索では，ブラウザインタフェースでクエリを入力し，クエリに類似したJupyter notebookを10件出力します．
 
-[Demo1](https://drive.google.com/file/d/1x1yiM8xQkwlJtQmQPgIOiSyN2d3QoUBu/view?usp=sharing)
+### デモ
 
-[Demo2](https://drive.google.com/file/d/19CfahRTEwlbaOSZQLLfiALocrVQ3SNkH/view?usp=sharing)
+![デモ動画](retrieval_system/images/Demo_gif3_2.gif "Demo(gif)")
 
+[Demo1(old version)](https://drive.google.com/file/d/1x1yiM8xQkwlJtQmQPgIOiSyN2d3QoUBu/view?usp=sharing)
+
+[Demo2(old version)](https://drive.google.com/file/d/19CfahRTEwlbaOSZQLLfiALocrVQ3SNkH/view?usp=sharing)
+
+### 評価実験
+
+![評価実験](retrieval_system/images/JupySim_experimental_evaluation.pdf "Experimental evaluation(pdf)")
 
 
 ## システムの構成要素
@@ -21,7 +29,7 @@
 
 * [Juneau](https://github.com/juneau-project/juneau.git)
 
-Juneauは計算ノートブックのグラフ化や類似度計算に利用しています．
+検索前に，あらかじめ加工されたJupyter notebookが保存されている必要があります．
 
 ## 準備
 
@@ -61,9 +69,6 @@ git clone https://github.com/juneau-project/juneau.git
 
 └── notebooks_data/
 
-data.zipはNeo4Jのデータ，notebooks_data.zipは.ipynbフォーマットのファイルが入っています．
-
-data.zipをNeo4Jのデータパスに解凍します．notebooks_data.zipは解凍し，ディレクトリnotebooks_data/をSimilarity_Search_on_Computational_Notebooks/と同じ階層に置きます．
 
 
 ## 検索Webアプリケーションの起動
