@@ -1,0 +1,31 @@
+{% load static %}
+<!doctype html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" type="text/css" href="{% static 'interface/css/style.css' %}"> <!-- load css file -->
+    <title>{% block title %}{% endblock %}</title>
+</head>
+<body>
+
+<!-- load D3.js -->
+<script src="https://d3js.org/d3.v5.js"></script>
+
+<!-- load jQuery -->
+<script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+
+<!-- load js file -->
+<script src="{% static 'interface/javascript/style.js' %}"></script>
+
+
+
+<!-- contents are written in layout.html -->
+{% block body %}{% endblock %}
+
+
+<!-- load js file -->
+{% block js_parts %}
+{% include "interface/js_parts.html" %}
+{% endblock %}
+</body>
+</html>

@@ -74,13 +74,31 @@ class CodeRelatedness:
         return ret_hash
 
 
-    def jaccard_similarity_coefficient(self, colA, colB):
-        if min(len(colA), len(colB)) == 0:
+    @staticmethod
+    def jaccard_similarity_coefficient(colA:list, colB:list) -> float:
+        """
+        The Jaccard similarity between two sets A and B is defined as
+        |intersection(A, B)| / |union(A, B)|.
+        集合Aと集合Bのジャカード類似度を計算する．
+
+        Args:
+            colA list[any]: データ値の集合.
+            colB list[any]: データ値の集合.
+
+        Returns:
+            float: ジャカード類似度．
+        """
+        try:
+            if min(len(colA), len(colB)) == 0:
+                return 0
+            colA = np.array(colA) #numpyの型に変換?
+            # 疑問: colBは変換しなくて良いのか？
+            colB = np.array(colB) #numpyの型に変換?
+            union = len(np.union1d(colA, colB))
+            inter = len(np.intersect1d(colA, colB))
+            return float(inter) / float(union)
+        except:
             return 0
-        colA = np.array(colA) #numpyの型に変換?
-        union = len(np.union1d(colA, colB))
-        inter = len(np.intersect1d(colA, colB))
-        return float(inter) / float(union)
 
 
     def cosine_similarity(self, vecA, vecB):

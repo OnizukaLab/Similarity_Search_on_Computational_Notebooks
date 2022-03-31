@@ -1,17 +1,52 @@
-<!doctype html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta http-equiv="Cache-Control" content="no-cache">
-    <title>{{ title }}</title>
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static',filename='css/style.css') }}">
-</head>
-<body>
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
-    <script src="/static/js/main.js"></script>
-    <script src="{% static 'javascript/style.js' %}""></script>
-{% block content %}
-<!-- ここにメインコンテンツを書く -->
+{% extends "interface/base.html" %}
+
+{% block body %}
+<!-- headder -->
+<div class="hero-header">
+    <div class="wrap">
+        <h1 class="hero-header_visual">
+            <p>{% block headder %}{% endblock %}</p>
+        </h1>
+    </div>
+</div>
+
+<!-- contents -->
+<div class="contents">
+    <div class="setting_query">
+        <div class="wrap">
+            <div class="wrapper">
+
+                <!-- 左半分 -->
+                {% block leftcontents %}{% endblock %}
+
+                <!-- 右半分 -->
+                {% block rightcontents %}{% endblock %}
+
+            </div>
+        </div>
+    </div>
+
+
+    <!-- 下部分（結果表示） -->
+    {% block bottomcontents %}{% endblock %}
+
+
+    {% block debugcontents %}
+    <div class="for_debug">
+        <div class = "wrap">
+            <h2 class="result_title">Debug</h2>
+            <p>{{debug_data}}</p>
+            {% for i in node_object_list %}
+            <p>{{i}}</p>
+            {% endfor %}
+            {% for i in edges %}
+            <p>{{i}}</p>
+            {% endfor %}
+            <p>{{debug_data}}</p>
+        </div>
+    </div>
+    {% endblock %}
+
+</div>
+
 {% endblock %}
-</body>
-</html>
