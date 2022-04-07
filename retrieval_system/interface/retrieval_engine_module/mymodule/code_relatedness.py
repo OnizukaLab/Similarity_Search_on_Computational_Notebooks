@@ -13,13 +13,20 @@ import numpy as np
 import networkx as nx
 import re
 
-sys.path.append('/Users/runa/Desktop/大学/4年/実装/my_code/juneau_copy')
-sys.path.append('/Users/runa/Desktop/大学/4年/実装/my_code/core-detection_copy/lib')
+current_dir=os.getcwd()
+if os.path.exists(f"{current_dir}/interface/retrieval_engine_module/module2"):
+    module2_path=f"{current_dir}/interface/retrieval_engine_module/module2"
+    flg_loading=True
+    sys.path.append(module2_path)
+else:
+    logging.error("module2 is not found in code_relatedness.py.")
+    logging.error(f"{current_dir}/interface/retrieval_engine_module/module2")
+    exit(1)
 from py2neo import Node, Relationship, NodeMatcher, RelationshipMatcher
-from juneau.config import config
-from juneau.utils.funclister import FuncLister
-from juneau.db.table_db import generate_graph, pre_vars
-from juneau.search.search_prov_code import ProvenanceSearch
+from module2.config import config
+from module2.utils.funclister import FuncLister
+from module2.db.table_db import generate_graph, pre_vars
+from module2.search.search_prov_code import ProvenanceSearch
 #from lib import CodeComparer
 
 
@@ -74,13 +81,31 @@ class CodeRelatedness:
         return ret_hash
 
 
-    def jaccard_similarity_coefficient(self, colA, colB):
-        if min(len(colA), len(colB)) == 0:
+    @staticmethod
+    def jaccard_similarity_coefficient(colA:list, colB:list) -> float:
+        """
+        The Jaccard similarity between two sets A and B is defined as
+        |intersection(A, B)| / |union(A, B)|.
+        集合Aと集合Bのジャカード類似度を計算する．
+
+        Args:
+            colA list[any]: データ値の集合.
+            colB list[any]: データ値の集合.
+
+        Returns:
+            float: ジャカード類似度．
+        """
+        try:
+            if min(len(colA), len(colB)) == 0:
+                return 0
+            colA = np.array(colA) #numpyの型に変換?
+            # 疑問: colBは変換しなくて良いのか？
+            colB = np.array(colB) #numpyの型に変換?
+            union = len(np.union1d(colA, colB))
+            inter = len(np.intersect1d(colA, colB))
+            return float(inter) / float(union)
+        except:
             return 0
-        colA = np.array(colA) #numpyの型に変換?
-        union = len(np.union1d(colA, colB))
-        inter = len(np.intersect1d(colA, colB))
-        return float(inter) / float(union)
 
 
     def cosine_similarity(self, vecA, vecB):

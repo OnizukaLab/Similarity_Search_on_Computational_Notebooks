@@ -47,7 +47,7 @@ form {
 .for_debug{
     background-color: rgb(143, 177, 189);
     padding: 1.0rem 0; 
-    visibility: hidden;
+    visibility: visible;
 }
 
 .label{
@@ -222,5 +222,16 @@ top: 45%;
 padding: .5em 1em;
 }
   
+.control {
+    margin-bottom: 20px;
+  }
   
+.control button {
+font-size: 1rem;
+line-height: 1;
+color: #4A4A4A;
+text-align: center;
+padding: .4rem .5rem;
+cursor: pointer;
+}
   

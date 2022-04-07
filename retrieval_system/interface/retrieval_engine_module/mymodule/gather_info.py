@@ -16,16 +16,17 @@ from threading import Lock
 
 
 
-sys.path.append('/Users/runa/Desktop/大学/4年/実装/my_code/juneau_copy')
-from juneau.config import config
-from juneau.db.schemamapping import SchemaMapping
-from juneau.db.table_db import generate_graph, pre_vars
-from juneau.search.search_prov_code import ProvenanceSearch
-from juneau.search.search_withprov import WithProv
-from juneau.utils.funclister import FuncLister
+current_dir=os.getcwd()
+sys.path.append(f"{current_dir}/interface/retrieval_engine_module/module2")
+from module2.config import config
+from module2.db.schemamapping import SchemaMapping
+from module2.db.table_db import generate_graph, pre_vars
+from module2.search.search_prov_code import ProvenanceSearch
+from module2.search.search_withprov import WithProv
+from module2.utils.funclister import FuncLister
 from jupyter_client import BlockingKernelClient
 from jupyter_client import find_connection_file
-from juneau.jupyter import jupyter
+from module2.jupyter import jupyter
 
 jupyter_lock = Lock()
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

@@ -1,764 +1,299 @@
-{% load static %}
-<!doctype html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <link rel="stylesheet" type="text/css" href="{% static 'interface/css/style.css' %}">
-    <title>{{ title }}</title>
-</head>
-<body>
-<style type="text/css">
+{% extends "interface/layout.html" %}
 
-    
-</style>
-<script src="https://d3js.org/d3.v5.js"></script>
-<script src="{% static 'interface/javascript/style.js' %}"></script>
+{% block title %}{{ title }}{% endblock %}
 
-<script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+{% block headder %}
+Jupyter Notebook Similarity Search System
+{% endblock %}
 
 
 
-<div class="hero-header">
-    <div class="wrap">
-        <h1 class="hero-header_visual">
-            <p>Jupyter Notebook Similarity Search System</p>
-        </h1>
+{% block leftcontents %}
+<div class="column cat1">
+    <!-- draw the current query graph -->
+    <div class="form_wrapper1">
+        <div class="form_wrapper2">
+            <div id="graph_viz"></div>
+            <svg width=100% height="350"></svg>
+        </div>
+    </div>
+    <br/>
+    <!-- save/load/export/delete query graphs -->
+    <div class="input_form">
+        <div class="form_wrapper1">
+            <div class="form_wrapper2">
+                <div class="question">
+                    Load query
+                </div>
+                <div class="answer">
+                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+                        {% csrf_token %}
+                        {{ form_setting_query.as_p }}
+                        <input type="submit" name="loading_button" value="Load"> 
+                    </form>
+                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+                        {% csrf_token %}
+                        {{ form_upload_query.as_p }}
+                        <input type="submit" name="loading_button" value="Load"> 
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="form_wrapper1">
+            <div class="form_wrapper2">
+                <div class="question">
+                    Save query
+                </div>
+                <div class="answer">
+                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+                        {% csrf_token %}
+                        <br/>
+                        <p>Save this query to the server</p>
+                        <label>Query name: </label>
+                        <input type="text" name="query_name" id="query_name" value="Enter a query name">
+                        <br/>
+                        <input type="submit" name="saving_button" value="Save"> 
+                    </form>
+                    <form class="input_form2" action="{% url 'interface:export' %}" method='POST'>
+                        {% csrf_token %}
+                        <p>Export this query as "<span id="export_file_name2">{{uploadfile.filename}}</span>.json"</p>
+                        <input type="text" name="export_file_name" id="export_file_name" value="Enter a query name">
+                        <input type="submit" name="saving_button" value="Export"> 
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="form_wrapper1">
+            <div class="form_wrapper2">
+                <div class="question">
+                    Delete query
+                </div>
+                <div class="answer">
+                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+                    {% csrf_token %}
+                        {{ form_setting_query.as_p }}
+                        <input type="submit" name="setting_button" value="Delete"> 
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="form_wrapper1">
+            <div class="form_wrapper2">
+                <div class="question">
+                    Reset query
+                </div>
+                <div class="answer">
+                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+                        {% csrf_token %}
+                        <input type="submit" name="setting_button" value="Reset"> 
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+    <!-- div class="input_form" -->
     </div>
 </div>
+<!-- ここまで左半分 -->
+{% endblock %}
 
-<div class="contents">
-    <div class="setting_query">
-        <div class="wrap">
-            <div class="wrapper">
 
-                <!-- ここから左半分 -->
-                <div class="column cat1">
-                    <div class="form_wrapper1">
-                        <div class="form_wrapper2">
-                            <div id="graph_viz"></div>
-                            <svg width=100% height="350"></svg>
-                        </div>
-                    </div>
+{% block rightcontents %}
+<div class="column cat2">
+    <div class="input_form">
+
+        <!-- button for search -->
+        <div class="form_wrapper1">
+            <div class="search_button_wrapper">
+            <form action="{% url 'interface:form' %}" method='POST'>
+                {% csrf_token %}
+                <input class="search_button" type="submit" name="search_button" value="SEARCH"> 
+            </form>
+            </div>
+        </div>
+        
+        <!-- error messages -->
+        <div class="error_field">
+            <div class="form_wrapper1">
+                <div class="form_wrapper2">
+                    {{err_msg}}
+                </div>
+            </div>
+        </div>
+
+        <!-- set weights -->
+        <div class="form_wrapper1">
+            <div class="form_wrapper2">
+                <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+                    {% csrf_token %}
+                    Set weights<br/>
+                    <label class="label_weight">code: </label>
+                    <input type="range" id="code_weight" name="code_weight" min="0" max="10" step="0.5" value={{code_weight}}>
+                    <span id="current-code_weight">{{code_weight}}</span>
                     <br/>
-                    <div class="input_form">
-                        <div class="form_wrapper1">
-                            <div class="form_wrapper2">
-                                <div class="question">
-                                    Load query
-                                </div>
-                                <div class="answer">
-                                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
-                                        {% csrf_token %}
-                                        {{ form_setting_query.as_p }}
-                                        <input type="submit" name="loading_button" value="Load"> 
-                                    </form>
-                                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
-                                        {% csrf_token %}
-                                        {{ form_upload_query.as_p }}
-                                        <input type="submit" name="loading_button" value="Load"> 
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="form_wrapper1">
-                            <div class="form_wrapper2">
-                                <div class="question">
-                                    Save query
-                                </div>
-                                <div class="answer">
-                                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
-                                        {% csrf_token %}
-                                        <br/>
-                                        <p>Save this query to the server</p>
-                                        <label>Query name: </label>
-                                        <input type="text" name="query_name" id="query_name" value="Enter a query name">
-                                        <br/>
-                                        <input type="submit" name="saving_button" value="Save"> 
-                                    </form>
-                                    <form class="input_form2" action="{% url 'interface:export' %}" method='POST'>
-                                        {% csrf_token %}
-                                        <p>Export this query as "<span id="export_file_name2">{{uploadfile.filename}}</span>.json"</p>
-                                        <input type="text" name="export_file_name" id="export_file_name" value="Enter a query name">
-                                        <input type="submit" name="saving_button" value="Export"> 
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="form_wrapper1">
-                            <div class="form_wrapper2">
-                                <div class="question">
-                                    Delete query
-                                </div>
-                                <div class="answer">
-                                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
-                                    {% csrf_token %}
-                                        {{ form_setting_query.as_p }}
-                                        <input type="submit" name="setting_button" value="Delete"> 
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="form_wrapper1">
-                            <div class="form_wrapper2">
-                                <div class="question">
-                                    Reset query
-                                </div>
-                                <div class="answer">
-                                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
-                                        {% csrf_token %}
-                                        <input type="submit" name="setting_button" value="Reset"> 
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-                        
-                    <!-- div class="input_form" -->
-                    </div>
-                </div>
-                <!-- ここまで左半分 -->
-
-
-                <div class="column cat2">
-                    <div class="input_form">
-                        <div class="form_wrapper1">
-                            <div class="search_button_wrapper">
-                            <form action="{% url 'interface:form' %}" method='POST'>
-                                {% csrf_token %}
-                                <input class="search_button" type="submit" name="search_button" value="SEARCH"> 
-                            </form>
-                            </div>
-                        </div>
-                        
-                        <div class="error_field">
-                            <div class="form_wrapper1">
-                                <div class="form_wrapper2">
-                                    {{err_msg}}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="form_wrapper1">
-                            <div class="form_wrapper2">
-                                <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
-                                    {% csrf_token %}
-                                    Set weights<br/>
-                                    <label class="label_weight">code: </label>
-                                    <input type="range" id="code_weight" name="code_weight" min="0" max="10" step="0.5" value={{code_weight}}>
-                                    <span id="current-code_weight">{{code_weight}}</span>
-                                    <br/>
-                                    <label class="label_weight">data: </label>
-                                    <input type="range" id="data_weight" name="data_weight" min="0" max="10" step="0.5" value={{data_weight}}>
-                                    <span id="current-data_weight">{{data_weight}}</span>
-                                    <br/>
-                                    <label class="label_weight">library: </label>
-                                    <input type="range" id="library_weight" name="library_weight" min="0" max="10" step="0.5" value={{library_weight}}>
-                                    <span id="current-library_weight">{{library_weight}}</span>
-                                    <br/>
-                                    <label class="label_weight">output: </label>
-                                    <input type="range" id="output_weight" name="output_weight" min="0" max="10" step="0.5" value={{output_weight}}>
-                                    <span id="current-output_weight">{{output_weight}}</span>
-                                    <br/>
-                                    <br/>
-                                    <input type="submit" name="setting_weight_button" value="Set"> 
-                                    <br/>
-                                </form>
-                            </div>
-                        </div>
-
-
-                        <div class="form_wrapper1">
-                            <div class="form_wrapper2">
-                                <div class="question">
-                                Set libraries
-                                </div>
-                                <div class="answer">
-                                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
-                                        {% csrf_token %}
-                                        {% for l in libraries_list %}
-                                            {{l}}<br/>
-                                        {% endfor %}
-                                        <label for="add_library_mode"></label>
-                                        <select id="add_library_mode">
-                                        <option value="mode_codes" selected>Copy and paste source code importing library</option>
-                                        <option value="mode_librarynames">Input library names separated by comma or new line</option>
-                                        </select>
-                                        <textarea name="libraries_contents" id="libraries_contents" value="" cols="50" rows="10"></textarea>
-                                        <br/>
-                                        <input type="submit" name="setting_button" value="Set">
-                                        <br/>
-                                        <input type="submit" name="setting_button" value="Delete">
-                                        <br/>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="form_wrapper1">
-                            <div class="form_wrapper2">
-                                <div class="question">
-                                    Set node
-                                </div>
-                                <div class="answer">
-                                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
-                                        {% csrf_token %}
-                                        <label>node id</label>
-                                        <input type="number" min="0" max="100" name="input_node_id" value="0" id="add_or_change_input">
-                                        {{ form_setting_type.as_p }}
-                                        <br/>contents:
-                                        <br/>
-                                        <textarea name="input_node_contents" id="input_node_contents" value="" cols="50" rows="10"></textarea>
-                                        <br/>
-                                        <label>parent node id</label>
-                                        <input type="number" min="0" max="100" name="input_parent_node_id" value="0">
-                                        <br/>
-                                        <input type="submit" id="add_or_change" name="setting_button" value="Set"> 
-                                        <br/>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="form_wrapper1">
-                            <div class="form_wrapper2">
-                                <div class="question">
-                                Delete node
-                                </div>
-                                <div class="answer">
-                                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
-                                        {% csrf_token %}
-                                        {{ form_setting_node.as_p }}
-                                        <input type="submit" name="setting_button" value="Delete"> 
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="form_wrapper1">
-                            <div class="form_wrapper2">
-                                <div class="question">
-                                Set edge
-                                </div>
-                                <div class="answer">
-                                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
-                                        {% csrf_token %}
-                                        {{ form_setting_parent_node.as_p }}
-                                        <br/>
-                                        <input type="submit" name="setting_button" value="Add"> 
-                                        <br/>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="form_wrapper1">
-                            <div class="form_wrapper2">
-                                <div class="question">
-                                Delete edge
-                                </div>
-                                <div class="answer">
-                                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
-                                        {% csrf_token %}
-                                        {{ form_delete_edge.as_p }}
-                                        <input type="submit" name="setting_button" value="Delete"> 
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-
-
-                    </div>
-                </div>
-
+                    <label class="label_weight">data: </label>
+                    <input type="range" id="data_weight" name="data_weight" min="0" max="10" step="0.5" value={{data_weight}}>
+                    <span id="current-data_weight">{{data_weight}}</span>
+                    <br/>
+                    <label class="label_weight">library: </label>
+                    <input type="range" id="library_weight" name="library_weight" min="0" max="10" step="0.5" value={{library_weight}}>
+                    <span id="current-library_weight">{{library_weight}}</span>
+                    <br/>
+                    <label class="label_weight">output: </label>
+                    <input type="range" id="output_weight" name="output_weight" min="0" max="10" step="0.5" value={{output_weight}}>
+                    <span id="current-output_weight">{{output_weight}}</span>
+                    <br/>
+                    <br/>
+                    <input type="submit" name="setting_weight_button" value="Set"> 
+                    <br/>
+                </form>
             </div>
         </div>
-    </div>
 
 
-    <div class="result">
-        <div class="wrap">
-            <div class="result_inner">
-                <h2 class="result_title">Search Results</h2>
-                <div class="search_time">{{search_time}}</div>
-                {% for item in arranged_result %}
-                <span class="ranking">{{item.rank}}  </span><a href="{{item.nb_url}}">{{item.nb_name}}</a><br/>
-                {% endfor %}
-                <br/>
+        <!-- set libraries of the current query graph -->
+        <div class="form_wrapper1">
+            <div class="form_wrapper2">
+                <div class="question">
+                Set libraries
+                </div>
+                <div class="answer">
+                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+                        {% csrf_token %}
+                        {% for l in libraries_list %}
+                            {{l}}<br/>
+                        {% endfor %}
+                        <label for="add_library_mode"></label>
+                        <select id="add_library_mode">
+                        <option value="mode_codes" selected>Copy and paste source code importing library</option>
+                        <option value="mode_librarynames">Input library names separated by comma or new line</option>
+                        </select>
+                        <textarea name="libraries_contents" id="libraries_contents" value="" cols="50" rows="10"></textarea>
+                        <br/>
+                        <input type="submit" name="setting_button" value="Set">
+                        <br/>
+                        <input type="submit" name="setting_button" value="Delete">
+                        <br/>
+                    </form>
+                </div>
             </div>
         </div>
+
+        <!-- set a node of the current query graph -->
+        <div class="form_wrapper1">
+            <div class="form_wrapper2">
+                <div class="question">
+                    Set node
+                </div>
+                <div class="answer">
+                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+                        {% csrf_token %}
+                        <label>node id</label>
+                        <input type="number" min="0" max="100" name="input_node_id" value="0" id="add_or_change_input">
+                        {{ form_setting_type.as_p }}
+                        <br/>contents:
+                        <br/>
+                        <textarea name="input_node_contents" id="input_node_contents" value="" cols="50" rows="10"></textarea>
+                        <br/>
+                        <label>parent node id</label>
+                        <input type="number" min="0" max="100" name="input_parent_node_id" value="0">
+                        <br/>
+                        <input type="submit" id="add_or_change" name="setting_button" value="Set"> 
+                        <br/>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- delete a node of the current query graph -->
+        <div class="form_wrapper1">
+            <div class="form_wrapper2">
+                <div class="question">
+                Delete node
+                </div>
+                <div class="answer">
+                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+                        {% csrf_token %}
+                        {{ form_setting_node.as_p }}
+                        <input type="submit" name="setting_button" value="Delete"> 
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- set an edge of the current query graph -->
+        <div class="form_wrapper1">
+            <div class="form_wrapper2">
+                <div class="question">
+                Set edge
+                </div>
+                <div class="answer">
+                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+                        {% csrf_token %}
+                        {{ form_setting_parent_node.as_p }}
+                        <br/>
+                        <input type="submit" name="setting_button" value="Add"> 
+                        <br/>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- delete an edge of the current query graph -->
+        <div class="form_wrapper1">
+            <div class="form_wrapper2">
+                <div class="question">
+                Delete edge
+                </div>
+                <div class="answer">
+                    <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
+                        {% csrf_token %}
+                        {{ form_delete_edge.as_p }}
+                        <input type="submit" name="setting_button" value="Delete"> 
+                    </form>
+                </div>
+            </div>
+        </div>
+
+
     </div>
+</div>
+{% endblock %}
 
 
-    <div class="for_debug">
-        <div class = "wrap">
-            <h2 class="result_title">Debug</h2>
-            <p>{{debug_data}}</p>
+{% block bottomcontents %}
+<!-- list notebooks of the search results as URLs for Jupyter Notebook -->
+<div class="result">
+    <div class="wrap">
+        <div class="result_inner">
+            <h2 class="result_title">Search Results</h2>
+            <div class="search_time">{{search_time}}</div>
+            {% for item in arranged_result %}
+            <span class="ranking">{{item.rank}}  </span><a href="{{item.nb_url}}">{{item.nb_name}}</a>
+            <form action="{% url 'interface:showresultworkflowgraph' %}" method='POST'>
+                {% csrf_token %}
+                <input type="submit" name="ShowWorkflowGraph" value="see the workflow graph"> 
+                <input type="text" name="nb_name" id="nb_name" value="{{item.cleaned_nb_name}}" style="visibility: hidden;">
+            </form>
+            <br/>
+            {% endfor %}
+            <br/>
         </div>
     </div>
-
 </div>
 
 
 
-<script>
-
-// ******** rangeバーの設定 **************************
-var inputElem = document.getElementById('code_weight'); // input要素
-var currentValueElem = document.getElementById('current-code_weight'); // 埋め込む先のspan要素
-var inputElem2 = document.getElementById('data_weight'); // input要素
-var currentValueElem2 = document.getElementById('current-data_weight'); // 埋め込む先のspan要素
-var inputElem3 = document.getElementById('library_weight'); // input要素
-var currentValueElem3 = document.getElementById('current-library_weight'); // 埋め込む先のspan要素
-var inputElem4 = document.getElementById('output_weight'); // input要素
-var currentValueElem4 = document.getElementById('current-output_weight'); // 埋め込む先のspan要素
-
-// 現在の値をspanに埋め込む関数
-var setCurrentValue = (val) => {
-    currentValueElem.innerText = val;
-}
-var setCurrentValue2 = (val) => {
-    currentValueElem2.innerText = val;
-}
-var setCurrentValue3 = (val) => {
-    currentValueElem3.innerText = val;
-}
-var setCurrentValue4 = (val) => {
-    currentValueElem4.innerText = val;
-}
-
-// inputイベント時に値をセットする関数
-var rangeOnChange = (e) =>{
-  setCurrentValue(e.target.value);
-}
-var rangeOnChange2 = (e) =>{
-  setCurrentValue2(e.target.value);
-}
-var rangeOnChange3 = (e) =>{
-  setCurrentValue3(e.target.value);
-}
-var rangeOnChange4 = (e) =>{
-  setCurrentValue4(e.target.value);
-}
-/*
-window.onload = () => {
-  inputElem.addEventListener('input', rangeOnChange); // スライダー変化時にイベントを発火
-  setCurrentValue(inputElem.value); // ページ読み込み時に値をセット
-  inputElem2.addEventListener('input', rangeOnChange2);
-  setCurrentValue2(inputElem2.value);
-  inputElem3.addEventListener('input', rangeOnChange3);
-  setCurrentValue3(inputElem3.value);
-  inputElem4.addEventListener('input', rangeOnChange4);
-  setCurrentValue4(inputElem4.value);
-}
-*/
-inputElem.addEventListener('input', rangeOnChange); // スライダー変化時にイベントを発火
-setCurrentValue(inputElem.value); // ページ読み込み時に値をセット
-inputElem2.addEventListener('input', rangeOnChange2);
-setCurrentValue2(inputElem2.value);
-inputElem3.addEventListener('input', rangeOnChange3);
-setCurrentValue3(inputElem3.value);
-inputElem4.addEventListener('input', rangeOnChange4);
-setCurrentValue4(inputElem4.value);
-
-// ******** 折りたたみ（アコーディオン）の設定 **************************
-// https://qiita.com/kei_1011/items/514c77698f4136889f6e
-
-jQuery(function ($) {
-  $(".answer").css("display", "none");
-  // 質問の答えをあらかじめ非表示
-
-  
-  
-  //質問をクリック
-  $(".question").click(function () {
-    
-    $(".question").not(this).removeClass("open");
-    //クリックしたquestion以外の全てのopenを取る
-
-    $(".question").not(this).next().slideUp(300);
-    //クリックされたquestion以外のanswerを閉じる
-    
-    $(this).toggleClass("open");
-    //thisにopenクラスを付与
-    
-    $(this).next().slideToggle(300);
-    //thisのcontentを展開、開いていれば閉じる
-  
-  });
-});
+{% endblock %}
 
 
-
-{% autoescape off %}
-var node_object_list = {{ node_object_list }};
-var edge_list = {{ edges }};
-{% endautoescape %}
+<!-- debug -->
+{% block debugcontents %}
+{% endblock %}
 
 
-// Add/Configure a node. のところのsubmitボタンの表示を変更する.
-// ノードidの入力部分にすでに保存されているノードidを入力した場合, Changeと表示する．
-// ノードidの入力部分にまだ保存されてないノードidを入力した場合, Addと表示する．
-var add_or_change = document.getElementById("add_or_change");
-var add_or_change_input = document.getElementById("add_or_change_input");
-var setCurrentValue5 = (val) => {
-    add_or_change.value = "Add";
-    for(var i=0;i<node_object_list.length;i++){
-        if(add_or_change_input.value==node_object_list[i].node_id){
-            add_or_change.value = "Change";
-            break;
-        }
-    }
-    add_or_change.innerText = val;
-}
-var rangeOnChange5 = (e) =>{
-  setCurrentValue5(e.target.value);
-}
-add_or_change_input.addEventListener('input', rangeOnChange5);
-setCurrentValue5(add_or_change_input.value);
-
-// ******** エクスポートの設定 **************************
-var inputElem6 = document.getElementById('export_file_name'); // input要素
-var currentValueElem6 = document.getElementById('export_file_name2'); // input要素
-var setCurrentValue6 = (val) => {
-    currentValueElem6.innerText = val;
-}
-var rangeOnChange6 = (e) =>{
-    setCurrentValue6(e.target.value);
-    /*
-    setTimeout(function(){
-        setCurrentValue6(e.target.value);
-    },500);
-    */
-}
-inputElem6.addEventListener('input', rangeOnChange6);
-setCurrentValue6(inputElem6.value);
-
-
-
-
-
-
-const TOOLTIP_MAX_TEXT_LENGTH=500;
-var tooltip = d3.select("body").append("div").attr("class", "tooltip");
-var tooltip_mode="normal" // normal or simple
-// *** nodeの見た目の設定 ***
-var node_r = 25; // ノードの半径
-edge_len = 100; // 辺の長さ
-// *** nodeの色設定 ***
-//var node_color_fill = "#adeed1";
-//var node_color_stroke = "#7ec5b3";
-var output_list=["text_output", "figure_output", "table_output"]
-var nodetype2nodecolor = {
-    "code":"#FA9950",
-    "data":"#7793D4",
-    "text_output":"#71AE48",
-    "figure_output":"#71AE48",
-    "table_output":"#71AE48",
-    "reachability":"#002060",
-};
-var nodetype2nodestrokecolor1 = { //薄い色
-    "code":"#FFD8B8",
-    "data":"#CAD6F5",
-    "text_output":"#C5EAAB",
-    "figure_output":"#C5EAAB",
-    "table_output":"#C5EAAB",
-    "reachability":"#8895AE",
-};
-var nodetype2nodestrokecolor2 = { //濃い色
-    "code":"#D36C15",
-    "data":"#5577CF",
-    "text_output":"#579829",
-    "figure_output":"#579829",
-    "table_output":"#579829",
-    "reachability":"#004BE0",
-};
-var edge_color = "#4472C4";
-var node_stroke_width = 4;
-var text_color="white";
-
-// toolkit表示のキャッシュ
-// TODO: ノードの内容を削除したり変更した場合に正常に動作するか確認
-var cache_tooltip_text = {"normal":{}, "simple":{}} // {mode: {node id: text}}
-
-
-
-drawgraph()
-
-
-function get_tooltip_contents_forDevelop(ind){
-    // 開発用
-    var tooltip_contents = "node id : ";
-    tooltip_contents += JSON.stringify(node_object_list[ind].node_id);
-    tooltip_contents += "<br>node type : ";
-    tooltip_contents += JSON.stringify(node_object_list[ind].node_type);
-    tooltip_contents += "<br>node contents : ";
-    tooltip_contents += JSON.stringify(node_object_list[ind].node_contents);
-    tooltip_contents += "<br>edges : ";
-    tooltip_contents += JSON.stringify(edge_list);
-    if (tooltip_contents.length > TOOLTIP_MAX_TEXT_LENGTH){
-        tooltip_contents = tooltip_contents.substr( 0, TOOLTIP_MAX_TEXT_LENGTH );
-        tooltip_contents += "...";
-    }
-    return tooltip_contents;
-}
-
-function get_tooltip_contents(ind){
-    if (tooltip_mode=="normal"){
-        return get_tooltip_contents_normal(ind);
-    }
-    if (tooltip_mode=="simple"){
-        return get_tooltip_contents_simple(ind);
-    }
-}
-
-function get_tooltip_contents_normal(ind){
-    if (ind in cache_tooltip_text["normal"]){ //キャッシュがあるとき
-        return cache_tooltip_text["normal"][ind];
-    }
-    var tooltip_contents = "<span class='tooltip_wrap1'>node id :</span>";
-    tooltip_contents += JSON.stringify(node_object_list[ind].node_id);
-
-    tooltip_contents += "<br/>";
-    tooltip_contents += "<span class='tooltip_wrap1'>type :</span>";
-    if (output_list.includes(node_object_list[ind].node_type)){
-        tooltip_contents += "output";
-        tooltip_contents += "<br/>";
-        tooltip_contents += "<span class='tooltip_wrap1'>contents :</span><span class='tooltip_wrap2'>";
-        tooltip_contents += node_object_list[ind].node_type;
-    }else{
-        tooltip_contents += node_object_list[ind].node_type;
-        tooltip_contents += "<br/>";
-        tooltip_contents += "<span class='tooltip_wrap1'>contents :</span><span class='tooltip_wrap2'>";
-        var contents = node_object_list[ind].node_contents;
-        while(contents.match("\n")){
-            contents = contents.replace("\n", "<br/>");
-        }
-        tooltip_contents += contents;
-        tooltip_contents += "</span>";
-    }
-
-    if (tooltip_contents.length > TOOLTIP_MAX_TEXT_LENGTH){
-        tooltip_contents = tooltip_contents.substr( 0, TOOLTIP_MAX_TEXT_LENGTH );
-        tooltip_contents += "...";
-    }
-    cache_tooltip_text["normal"][ind] = tooltip_contents
-    return tooltip_contents;
-}
-
-function get_tooltip_contents_simple(ind){
-    // get_tooltip_contentsと違う点： node id, node typeを非表示
-    if (ind in cache_tooltip_text["simple"]){ //キャッシュがあるとき
-        return cache_tooltip_text["simple"][ind];
-    }
-    var tooltip_contents = "<span class='tooltip_wrap2'>";
-    if (output_list.includes(node_object_list[ind].node_type)){
-        tooltip_contents += node_object_list[ind].node_type;
-    }else{
-        var contents = node_object_list[ind].node_contents;
-        while(contents.match("\n")){
-            contents = contents.replace("\n", "<br/>");
-        }
-        tooltip_contents += contents;
-        tooltip_contents += "</span>";
-    }
-
-    if (tooltip_contents.length > TOOLTIP_MAX_TEXT_LENGTH){
-        tooltip_contents = tooltip_contents.substr( 0, TOOLTIP_MAX_TEXT_LENGTH );
-        tooltip_contents += "...";
-    }
-    cache_tooltip_text["simple"][ind] = tooltip_contents
-    return tooltip_contents;
-}
-
-function drawgraph(){
-    // 参考1: https://qiita.com/daxanya1/items/734e65a7ca58bbe2a98c
-    // 参考2: https://wizardace.com/d3-forcesimulation-onlynode/
-
-    // 1. 描画用のデータ準備
-    //var width = document.querySelector("svg").clientWidth;
-    //var height = document.querySelector("svg").clientHeight;
-    var nodeNumber = node_object_list.length;
-    var nodesData = [];
-    var nodeid2ind = {};
-    for(var i = 0; i < nodeNumber; i++) {
-        nodesData.push({
-            "index": node_object_list[i].node_id,
-            "x": width * Math.random(),
-            "y": height * Math.random(),
-            "r": node_r,
-            "nodetype": node_object_list[i].node_type,
-        });
-        nodeid2ind[node_object_list[i].node_id]=i
-    }
-
-    var linksData = [];
-    for(var i=0;i<edge_list.length;i++){
-        num_i = edge_list[i].parent_node_id;
-        num_j = edge_list[i].successor_node_id;
-        linksData.push({
-            "source": nodeid2ind[num_i],
-            "target": nodeid2ind[num_j],
-            "l": edge_len
-        });
-    }
-
-
-    // 2. svg要素を配置
-    // DAG表現のための矢印
-    var marker = d3.select("svg").append("svg:defs").append("svg:marker")
-    .attr("id", "triangle")
-    .attr("refX", node_r+node_stroke_width+10)
-    .attr("refY", 6)
-    .attr("markerWidth", 30)
-    .attr("markerHeight", 30)
-    .attr("orient", "auto")
-    .append("path")
-    .attr("d", "M 0 0 12 6 0 12 3 6")
-    .style("fill", edge_color);
-
-    // 辺
-    var link = d3.select("svg")
-    .selectAll("line")
-    .data(linksData)
-    .enter()
-    .append("line")
-    .attr("stroke-width", 1)
-    .attr("stroke", edge_color)
-    .attr("marker-end", "url(#triangle)");
-
-    // ノード
-    var mouse_flg = 0; // ノードをクリックしたら，他のノードにmouseoverするまでそこにtooltipを固定する．
-    var node = d3.select("svg")
-    .selectAll("circle")
-    .data(nodesData)
-    .enter()
-    .append("circle")
-    .attr("r", function(d) { return d.r })
-    .style("fill", function(d) { return nodetype2nodecolor[d.nodetype] }) // 元 .style("fill", node_color_fill)
-    .attr("stroke", function(d) { return nodetype2nodestrokecolor1[d.nodetype] }) //.attr("stroke", node_color_stroke)
-    .style("stroke-width", node_stroke_width)
-    .on("mouseover", function(d) {
-        // tooltip_contentsはなんども呼び出すのであらかじめvar node外でリスト等に格納する方が高速になりそう．
-        var ind = d.index;
-        var tooltip_contents = get_tooltip_contents(ind);
-        tooltip
-            .style("visibility", "visible")
-            .html(tooltip_contents);
-        mouse_flg=0;
-        d3.select(this)
-            .attr("stroke", function(d) { return nodetype2nodestrokecolor2[d.nodetype] });
-        })
-    .on("mousemove", function(d) {
-        tooltip
-            .style("top", (d3.event.pageY - 20) + "px")
-            .style("left", (d3.event.pageX + 10) + "px");
-        })
-    .on("mouseout", function(d) {
-        if(mouse_flg==0){
-            tooltip.style("visibility", "hidden");
-            d3.select(this)
-                .attr("stroke", function(d) { return nodetype2nodestrokecolor1[d.nodetype] });
-        }
-        })
-    .on("mousedown", function(d, i) { //これは無くて良い
-        var ind = d.index
-        var tooltip_contents = get_tooltip_contents(ind);
-        //var tooltip_contents = get_tooltip_contents_forDevelop(ind);
-        tooltip
-            .style("visibility", "visible")
-            .html(tooltip_contents);
-        //mouse_flg=1;
-        })
-    .on("mouseup", function() { 
-        d3.select(this)
-            .attr("stroke", "black");
-        })
-    .call(d3.drag()
-        .on("start", dragstarted)
-        .on("drag", dragged)
-        .on("end", dragended));
-
-
-    var label = d3.select("svg")
-    .attr("class", "label")
-    .selectAll("label")
-    .data(nodesData, function(d) {return d.index; } )
-    .enter()
-    .append('text')
-    .attr('text-anchor', "middle")
-    .attr('dy', ".35em")
-    .attr('fill', text_color)
-    .text(function(d, i) { return d.index; });
-
-
-
-    // 3. forceSimulation設定
-    var simulation = d3.forceSimulation()
-    .force("link",
-        d3.forceLink()
-        .distance(function(d) { return d.l; })
-        .strength(0.03)
-        .iterations(16))
-    .force("collide",
-        d3.forceCollide()
-        .radius(function(d) { return d.r; })
-        .strength(0.7)
-        .iterations(16))
-    .force("charge", d3.forceManyBody().strength(-200))
-    .force("x", d3.forceX().strength(0.02).x(width / 2))
-    .force("y", d3.forceY().strength(0.02).y(height / 2));
-
-    simulation
-    .nodes(nodesData)
-    .on("tick", ticked);
-
-    simulation.force("link")
-    .links(linksData)
-    .id(function(d) { return d.index; });
-
-    // 4. forceSimulation 描画更新用関数
-    function ticked() {
-    link
-        .attr("x1", function(d) { return d.source.x; })
-        .attr("y1", function(d) { return d.source.y; })
-        .attr("x2", function(d) { return d.target.x; })
-        .attr("y2", function(d) { return d.target.y; });
-    node
-        .attr("cx", function(d) { return d.x; })
-        .attr("cy", function(d) { return d.y; });
-
-    label
-        .attr("x", function(d) { return d.x; })
-        .attr("y", function(d) { return d.y; });
-    }
-
-    // 5. ドラッグ時のイベント関数
-    function dragstarted(d) {
-    if(!d3.event.active) simulation.alphaTarget(0.3).restart();
-    d.fx = d.x;
-    d.fy = d.y;
-    }
-
-    function dragged(d) {
-    d.fx = d3.event.x;
-    d.fy = d3.event.y;
-    }
-
-    function dragended(d) {
-    if(!d3.event.active) simulation.alphaTarget(0);
-    d.fx = null;
-    d.fy = null;
-    }
-
-}
-
-</script>
-
-
-
-
-
-</body>
-</html>
+{% block js_parts %}
+{% include "interface/js_parts.html" %}
+{% endblock %}

@@ -1,20 +1,4 @@
-# Copyright 2020 Juneau
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 """
-Module to store a table's provenance.
-
 TODO:calc_v_microbenchmark["load"]を廃止．
 TODO:コード類似度計算をcode_similarityに統一．
 """
@@ -37,13 +21,12 @@ import random
 from typing import Tuple, Union, List # annotations
 
 from py2neo import Node, Relationship, NodeMatcher, RelationshipMatcher
-from juneau.config import config
-from juneau.utils.funclister import FuncLister
-from juneau.db.table_db import generate_graph, pre_vars
-from juneau.search.search_prov_code import ProvenanceSearch
+from mymodule.config import config
+from module2.utils.funclister import FuncLister
+from module2.db.table_db import generate_graph
 from mymodule.code_relatedness import CodeRelatedness
 from mymodule.code_similarity import CodeSimilarity
-from juneau.db.schemamapping import SchemaMapping
+from module2.db.schemamapping import SchemaMapping
 #from lib import CodeComparer
 
 NUM_STR_LIST = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
@@ -66,7 +49,7 @@ class WorkflowMatching:
     
     graph_db (Graph): py2neoのクラス`Graph`のインスタンス
     """
-    def __init__(self, postgres_eng, graph_eng, sim_col_thres:float=0.5, w_c:float=1, w_v:float=1, w_l:float=1, w_d:float=1, k:int=6, change_next_node_thres:float=0.8, valid_nb_name_file_path:str="../データセット/valid_nb_name.txt", flg_juneau:bool=False):#, thres_data_profile=0.9):
+    def __init__(self, postgres_eng, graph_eng, sim_col_thres:float=0.5, w_c:float=1, w_v:float=1, w_l:float=1, w_d:float=1, k:int=6, change_next_node_thres:float=0.8, valid_nb_name_file_path:str="../データセット/valid_nb_name.txt", flg_juneau:bool=False):
         """
         PostgreSQLのインスタンスとpy2neoのインスタンスをインスタンスにセットする．
 
@@ -80,9 +63,6 @@ class WorkflowMatching:
         self.postgres_eng = postgres_eng
         self.query_workflow = [] #query_nodeの名前の方がいいかも
         self.query_relationship={}
-        self.query_data = []
-        self.query_display_type=[]
-        self.nb_node_dict={} # dict{str: list[Node]}: {NB name: [Nodes in the NB]}, initialized by "fetch_db_node"
         self.root_list=[]
         self.root_list2=[]
         self.query_cell_code={}
@@ -98,7 +78,6 @@ class WorkflowMatching:
         self.display_type={}
         self.display_type_and_cell_id={}
         self.cell_source_code={} #dict{str: dict{int: str}}: {nb name: {cell id: source code}}
-        self.graphs_dependencies={}
         self.sim_col_thres=sim_col_thres
         self.nb_name_group_id={} # {str: int}. {NB名: グループID}関数set_group_idでセット
         self.w_c=w_c
@@ -115,9 +94,6 @@ class WorkflowMatching:
         self.class_code_relatedness=CodeRelatedness()
         self.invalid_by_workflow_structure={"invalid":set(), "valid":set()}
         self.calc_v_count=0
-        #self.data_profile={}
-        #self.thres_data_profile=thres_data_profile
-        self.element_profile={}
         self.nb_node_list={}
         self.init_each_calc_time_sum()
 
@@ -135,7 +111,11 @@ class WorkflowMatching:
 
 
     def init_each_calc_time_sum(self):
-        """Initialize self.each_calc_time_sum"""
+        """
+        Initialize self.each_calc_time_sum.
+        
+        時間計測のための辞書の初期化．
+        """
         self.each_calc_time_sum={"Cell":0.0, "Var":0.0, "Display_data":0.0, "Library":0.0}
 
     def set_each_w(self, w_c:float=None, w_v:float=None, w_l:float=None, w_d:float=None):
@@ -203,57 +183,6 @@ class WorkflowMatching:
         store_json=json.dumps(store_json)
         with open(calculated_sim_path, mode="w") as f:
             f.write(store_json)
-
-    
-    def fetch_db_node(self):
-        """
-        For development.
-        Neo4Jに格納されている全てのノードを取り出す．
-        """
-        matcher = NodeMatcher(self.graph_db) #matcherの初期化
-        r_matcher = RelationshipMatcher(self.graph_db) #matcherの初期化
-        cell_node_list = matcher.match("Cell").all()
-        var_node_list = matcher.match("Var").all()
-        root_count=0
-
-        def append_node2nb_node_dict(nb_name, node):
-            if not nb_name in self.nb_node_dict:
-                self.nb_node_dict[nb_name]=[]
-            self.nb_node_dict[nb_name].append(node)
-
-        #セルノードのnb名
-        for node in cell_node_list:
-            nb_name=node["nb_name"]
-            append_node2nb_node_dict(nb_name, node)
-            node_name=node["name"]
-            try:
-                if (r_matcher.match((node,), r_type="Parent").first()) is None:
-                    if node not in self.root_list:
-                        if node["real_cell_id"] != 1:
-                            self.root_list2.append([node["name"], node["nb_name"], node["real_cell_id"]])
-                        self.root_list.append(node)
-                    #logging.info(f"node {node_name} in nb {nb_name} is a root node.")
-                    root_count+=1
-            except:
-                pass
-
-        #変数ノードのnb名
-        for node in var_node_list:
-            node_name=node["name"]
-            nb_name=node_name[node_name.rindex("_")+1:]
-            #print(nb_name)
-            append_node2nb_node_dict(nb_name, node)
-
-        exist_nb_name=[]
-        for i in self.nb_node_dict:
-            for n in self.nb_node_dict[i]:
-                if n in self.root_list:
-                    exist_nb_name.append(i)
-        for i in self.nb_node_dict:
-            if i not in exist_nb_name:
-                logging.info(i)
-        logging.info(f"root_count: {root_count}, nb_name count: {len(self.nb_node_dict)}")
-        print(self.root_list2)
 
     #実際のNBの一部 
     # 実行時間の測定に利用
@@ -384,116 +313,6 @@ class WorkflowMatching:
         max_outdegree=3
         query_root="cell_query_1"
         return base_QueryGraph, query_root, cell_count, var_count, display_count_dict, max_indegree, max_outdegree
-
-    def make_query_base_graph_cell_only_1(self):
-        """For experiments."""
-        base_QueryGraph=nx.DiGraph()
-        for i in range(1,5):
-            base_QueryGraph.add_node(f"cell_query_{i}", node_type="Cell", real_cell_id=f"{i}")
-        base_QueryGraph.add_edge("cell_query_1", "cell_query_2")
-        base_QueryGraph.add_edge("cell_query_2", "cell_query_3")
-        base_QueryGraph.add_edge("cell_query_3", "cell_query_4")
-        cell_count=4
-        var_count=0
-        display_count_dict={}
-        max_indegree=1
-        max_outdegree=1
-        query_root="cell_query_1"
-        return base_QueryGraph, query_root, cell_count, var_count, display_count_dict, max_indegree, max_outdegree
-
-
-    def make_sample_query(self, query_nb_name):
-        """For experiments."""
-        cid=1
-        data_id=1
-        filepath="../../データセット/query_sample/"+query_nb_name
-        if not os.path.exists(filepath):
-            raise Exception("File does not exist: "+filepath)
-        prev_node=None
-        
-        # inform notebook file
-        with open(filepath,"r") as r:
-            nb = nbf.read(r,as_version=3) # nbconvert format version = 3
-            for x in nb.worksheets:
-                for cell in x.cells:
-                    if cell.cell_type =="code":
-                        if not cell.language == 'python':
-                            raise ValueError('Code must be in python!')
-                        if cell.input.strip() != "":
-                            cell_code=self.cleaning_one_cell_code(cell.input.split("\n"))
-                            self.query_cell_code[cid]=cell_code
-                            new_cell_node=Node("Cell", real_cell_id=cid+1)
-                            if len(self.query_workflow)==0:
-                                self.query_root=new_cell_node
-                            if prev_node != None:
-                                if prev_node not in self.query_relationship:
-                                    self.query_relationship[prev_node]=[]
-                                self.query_relationship[prev_node].append(new_cell_node)
-                            self.query_workflow.append(new_cell_node)
-                            #print(self.query_cell_code[cid])
-                            dep, _1, _2 =self.__parse_code(cell_code)
-                            for j in dep:
-                                if type(dep[j][0][0]) is tuple:
-                                    print(dep[j][0][0][0])
-                                    new_var_node=Node("Var", var_name=dep[j][0][0][0], data_id=data_id)
-                                    data_id+=1
-                                    self.query_relationship[new_cell_node].append(new_var_node)
-                                else:
-                                    print(dep[j][0][0])
-                                    new_var_node=Node("Var", var_name=dep[j][0][0], data_id=data_id)
-                                    data_id+=1
-                                    self.query_relationship[new_cell_node].append(new_var_node)
-                                if len(dep[j][1])==0:
-                                    continue
-                                if type(dep[j][1][0]) is tuple:
-                                    pass
-                                    #print(dep[j][1][0][0])
-                                else:
-                                    pass
-                                    #print(dep[j][1][0])
-                                #new_var_node = Node("Var", var_name)
-                                #self.query_relationship[new_cell_node] = new_var_node
-                            prev_node=new_cell_node
-                    cid+=1
-    
-    def make_sample_query_nx1_2_old(self):
-        """For experiments."""
-        self.QueryGraph=nx.DiGraph()
-
-        # 頂点のセット
-        for i in range(1,4):
-            self.QueryGraph.add_node(f"cell_query_{i}", node_type="Cell", real_cell_id=f"{i}")
-        self.QueryGraph.add_node("query_var1", node_type="Var", data_type="pandas.core.frame.DataFrame")
-
-        # 辺のセット
-        self.QueryGraph.add_edge("cell_query_1", "cell_query_2", edge_type="Successor")
-        self.QueryGraph.add_edge("cell_query_2", "cell_query_3", edge_type="Successor")
-        self.QueryGraph.add_edge("cell_query_2", "query_var1", edge_type="Contains")
-
-        # 根を設定
-        self.query_root="cell_query_1"
-
-        # テーブルのセット
-        self.query_table["query_var1"]=self.fetch_var_table("3_df_edaonindiancuisine")
-
-        # ソースコードのセット
-        code_table=self.fetch_source_code_table("edaonindiancuisine")
-        code=code_table[code_table["cell_id"]==3]["cell_code"].values
-        code="".join(list(code))
-        self.query_cell_code[f"cell_query_1"]=code
-        code=code_table[code_table["cell_id"]==5]["cell_code"].values
-        code="".join(list(code))
-        self.query_cell_code[f"cell_query_2"]=code
-        code=code_table[code_table["cell_id"]==7]["cell_code"].values
-        code="".join(list(code))
-        self.query_cell_code[f"cell_query_3"]=code
-
-        # ライブラリのセット
-        self.query_lib=self.fetch_all_library_from_db("edaonindiancuisine")
-
-        self.attr_of_q_node_type = nx.get_node_attributes(self.QueryGraph, "node_type")
-        self.attr_of_q_real_cell_id=nx.get_node_attributes(self.QueryGraph, "real_cell_id")
-        self.query_workflow_info={"Cell": 3, "Var": 1, "Display_data": {}, "max_indegree": 1, "max_outdegree": 2}
 
     def make_sample_query_nx1_2(self):
         """For experiments."""
@@ -752,48 +571,6 @@ class WorkflowMatching:
         self.query_lib=self.fetch_all_library_from_db("edaonindiancuisine")
         self.query_workflow_info={"Cell": 4, "Var": 1, "Display_data": {"DataFrame": 1}, "max_indegree": 1, "max_outdegree": 2}
         self.set_query_workflow_info_Display_data()
-
-    #実際のNBの一部
-    def make_sample_query_nx2_3_old(self):
-        """For experiments."""
-        self.QueryGraph=nx.DiGraph()
-
-        for i in range(1,5):
-            self.QueryGraph.add_node(f"cell_query_{i}", node_type="Cell", real_cell_id=f"{i}")
-        self.QueryGraph.add_node("query_var1", node_type="Var", data_type="pandas.core.frame.DataFrame")
-        #参考: self.G.add_node(node["name"], node_type="Display_data", nb_name=node["nb_name"], display_type=node["data_type"], cell_id=node["real_cell_id"])
-        self.QueryGraph.add_node("query_display2", node_type="Display_data", display_type="DataFrame", cell_id="2")
-        self.QueryGraph.add_node("query_display1", node_type="Display_data", display_type="DataFrame", cell_id="4")
-
-        self.QueryGraph.add_edge("cell_query_1", "cell_query_2", edge_type="Successor")
-        self.QueryGraph.add_edge("cell_query_2", "cell_query_3", edge_type="Successor")
-        self.QueryGraph.add_edge("cell_query_2", "query_display2", edge_type="Display")
-        self.QueryGraph.add_edge("cell_query_3", "cell_query_4", edge_type="Successor")
-        self.QueryGraph.add_edge("cell_query_2", "query_var1", edge_type="Contains")
-        self.QueryGraph.add_edge("cell_query_4", "query_display1", edge_type="Display")
-
-        self.query_root="cell_query_1"
-        self.query_table["query_var1"]=self.fetch_var_table("3_df_edaonindiancuisine")
-
-        code_table=self.fetch_source_code_table("edaonindiancuisine")
-        code=code_table[code_table["cell_id"]==2]["cell_code"].values
-        code="".join(list(code))
-        self.query_cell_code[f"cell_query_1"]=code
-        code=code_table[code_table["cell_id"]==3]["cell_code"].values
-        code="".join(list(code))
-        self.query_cell_code[f"cell_query_2"]=code
-        code=code_table[code_table["cell_id"]==4]["cell_code"].values
-        code="".join(list(code))
-        self.query_cell_code[f"cell_query_3"]=code
-        code=code_table[code_table["cell_id"]==5]["cell_code"].values
-        code="".join(list(code))
-        self.query_cell_code[f"cell_query_4"]=code
-
-        self.attr_of_q_node_type = nx.get_node_attributes(self.QueryGraph, "node_type")
-        self.attr_of_q_real_cell_id=nx.get_node_attributes(self.QueryGraph, "real_cell_id")
-        self.attr_of_q_display_type=nx.get_node_attributes(self.QueryGraph, "display_type")
-        self.query_lib=self.fetch_all_library_from_db("edaonindiancuisine")
-        self.query_workflow_info={"Cell": 4, "Var": 1, "Display_data": {"DataFrame": 2}, "max_indegree": 1, "max_outdegree": 3}
 
     #実際のNBの一部
     # ユーザ実験に利用
@@ -1488,37 +1265,6 @@ class WorkflowMatching:
             self.db_workflow_info[nb_name]["max_indegree"]=max(indegree, self.db_workflow_info[nb_name]["max_indegree"])
             self.db_workflow_info[nb_name]["max_outdegree"]=max(outdegree, self.db_workflow_info[nb_name]["max_outdegree"])
             
-
-    def get_sta_of_dataset_old(self):
-        self.get_db_workflow_info()
-        self.set_all_label_node_list()
-        num_of_nb=len(self.db_workflow_info)
-        num_of_node={"max":{}, "min":{}, "avg":{}, "sum":0}
-        sta_of_table_data={"max":0, "min":0, "avg":0, "sum":0}
-        num_of_node["max"]={"All":0, "Cell":0, "Var":0, "Display_data":0}
-        num_of_node["sum"]={"All":0, "Cell":0, "Var":0, "Display_data":0}
-        num_of_node["min"]={"All":1001001, "Cell":1001001, "Var":1001001, "Display_data":1001001}
-        num_of_node["avg"]={}
-        num_of_node["avg"]["All"]=len(self.G.nodes)/num_of_nb
-        for node_type in self.all_node_list:
-            num_of_node["avg"][node_type]=len(self.all_node_list[node_type])/num_of_nb
-
-        for nb_name in self.db_workflow_info:
-            num_of_any_type_node=0
-            for node_type in self.all_node_list:
-                num_of_node["min"][node_type]=min(self.db_workflow_info[nb_name][node_type], num_of_node["min"][node_type])
-                num_of_node["max"][node_type]=max(self.db_workflow_info[nb_name][node_type], num_of_node["max"][node_type])
-                num_of_any_type_node+=self.db_workflow_info[nb_name][node_type]
-                num_of_node["sum"][node_type]
-            #num_of_node["min"][node_type]=min(num_of_any_type_node, num_of_node["min"][node_type])
-            #num_of_node["max"][node_type]=max(num_of_any_type_node, num_of_node["max"][node_type])
-        for var_name in self.all_node_list["Var"]:
-            table_size = self.get_table_size3(self.fetch_var_table(var_name))
-            sta_of_table_data["min"] = min(table_size, sta_of_table_data["min"])
-            sta_of_table_data["max"] = max(table_size, sta_of_table_data["max"])
-            sta_of_table_data["sum"] += table_size
-        sta_of_table_data["avg"]=sta_of_table_data["sum"]/num_of_nb
-
     def get_sta_of_dataset(self):
         self.get_db_workflow_info()
         self.set_all_label_node_list()
@@ -1754,35 +1500,7 @@ class WorkflowMatching:
             return self.real_subgraph_matching_part_weaving_with_timecount(limit, nb_limit, flg_knn=flg_knn)
         else:
             self.real_subgraph_matching_part_weaving_without_timecount(limit, nb_limit, flg_knn)
-
-
-    def chk_invalid_by_workflow_structure_old(self, nb_name):
-        """
-        return True if num of any workflow components is less than query
-        """
-        if nb_name in list(self.invalid_by_workflow_structure["invalid"]):
-            return True
-        for ele in list(self.query_workflow_info):
-            if ele not in self.db_workflow_info[nb_name]:
-                #logging.info(f"'{ele}' not in self.db_workflow_info['{nb_name}']")
-                #return True
-                continue
-            if ele == "Display_data":
-                for display_type in self.query_workflow_info[ele]:
-                    if display_type not in self.db_workflow_info[nb_name][ele]:
-                        #logging.info(f"'{display_type}' not in self.db_workflow_info['{nb_name}']['{ele}']")
-                        self.invalid_by_workflow_structure["invalid"].add(nb_name)
-                        return True
-                    elif self.query_workflow_info[ele][display_type] > self.db_workflow_info[nb_name][ele][display_type]:
-                        #logging.info(f"self.query_workflow_info['{ele}']['{display_type}'] > self.db_workflow_info['{nb_name}']['{ele}']['{display_type}']")
-                        self.invalid_by_workflow_structure["invalid"].add(nb_name)
-                        return True
-            elif self.query_workflow_info[ele] > self.db_workflow_info[nb_name][ele]:
-                #logging.info(f"self.query_workflow_info['{ele}'] > self.db_workflow_info['{nb_name}']['{ele}']")
-                self.invalid_by_workflow_structure["invalid"].add(nb_name)
-                return True
-        return False
-        
+  
     # 使用
     def chk_invalid_by_workflow_structure(self, nb_name):
         """
@@ -1824,113 +1542,6 @@ class WorkflowMatching:
         self.invalid_by_workflow_structure["valid"].add(nb_name)
         return False
         
-    # 使用
-    def real_subgraph_matching_part_with_timecount_old(self, limit=None, nb_limit=None):
-        """
-        先に関数set_db_graphでデータベースから読み込んでグラフをself.Gに格納している必要あり．
-        サブグラフマッチングを一括で行う．
-        クエリグラフはself.QueryGraph
-
-        少しだけ参考: https://github.com/qinshimeng18/subgraph-matching/blob/master/main.py
-
-        self.attributes:
-            self.ans_list (list[list[Node]]): サブグラフマッチングで検索したサブグラフのノード集合のリストのリスト．
-
-        Returns:
-            float: この関数全体の処理時間
-            float: サブグラフが検出された開始ノードに対し，次の開始ノードのセットなどを除く処理時間
-            int-like: サブグラフが検出された開始ノードの数
-            float: サブグラフが検出されなかった開始ノードに対し，次の開始ノードのセットなどを除く処理時間
-            int-like: サブグラフが検出されなかった開始ノードの数
-            int-like: 検出されたサブグラフの個数
-        """
-        start_time1 = timeit.default_timer()
-        time2=0
-        n_count2=0
-        time3=0
-        n_count3=0
-        self.detected_count=0
-        
-        visited=[]
-        matched=[]
-        count=0 #あとで消す
-        nb_name_list=[] #あとで消す
-
-        #有効なnb名をセット
-        self.set_valid_nb_name()
-
-        query_label=self.attr_of_q_node_type[self.query_root]
-        node_db_list=[]
-        if query_label in ["Cell", "Var", "Display_data"]:
-            node_db_list=self.all_node_list[query_label]
-        else: # クエリのrootがOneWildcardまたはAnyWildcardのとき
-            node_db_list=self.G.nodes # list[str]
-
-
-        for node_db in node_db_list:
-            # node_db (str): データベースのノートブックをワークフロー化したグラフのノード
-            nb_name=self.attr_of_db_nb_name[node_db]
-            if nb_name not in self.valid_nb_name:
-                continue
-            # *********以下 あとで消す***************************************************
-            count+=1 #あとで消す
-            if (not limit is None) and count>=limit: #あとで消す
-                break #あとで消す
-            if  (not nb_limit is None) and len(self.ans_list) >= nb_limit: #あとで消す
-                break #あとで消す
-            if nb_name not in nb_name_list: #あとで消す
-                nb_name_list.append(nb_name) #あとで消す
-                #logging.info(f"nb name: {nb_name}") #あとで消す
-            # *********以上 あとで消す***************************************************
-
-            
-            ret_list=[]
-            #logging.info("detecting subgraph...")
-            roop_count=0
-            matched=[]
-            visited=[]
-            #if self.query_root.has_label("Cell") or self.query_root.has_label("Var"):
-                #matched.append((self.query_root["name"], node_db["name"]))
-            if nb_name not in self.ans_list:
-                self.ans_list[nb_name]=[]
-
-            self.flg_detection=False
-            
-            start_time2 = timeit.default_timer()
-            detected_subgraph=self.rec_new4(ret_list, self.query_root, node_db, visited, matched, nb_name)
-            end_time2 = timeit.default_timer()
-                
-            #print("detected subgraph:", detected_subgraph)
-            if self.flg_detection:
-                n_count2+=1
-                time2+=(end_time2-start_time2)
-            else:
-                n_count3+=1
-                time3+=(end_time2-start_time2)
-        end_time1 = timeit.default_timer()
-        time1 = end_time1 - start_time1
-
-        #print("")
-        #print("-------- ans_list --------")
-        #print(self.ans_list)
-
-        logging.info("subgraph matching completed!")
-        logging.info(f"time1: {time1}")
-        if n_count2==0:
-            logging.info(f"exist subgraph root: {time2}, {n_count2}")
-        else:
-            logging.info(f"exist subgraph root: {time2}, {n_count2}, per one root: {time2/n_count2}")
-        if n_count3==0:
-            logging.info(f"no subgraph root: {time3}, {n_count3}")
-        else:
-            logging.info(f"no subgraph root: {time3}, {n_count3}, per one root: {time3/n_count3}")
-        logging.info(f"detected subgraph: {self.detected_count}")
-        logging.info(f"calculated num of nb: {len(nb_name_list)}")
-        if len(nb_name_list) != 0:
-            logging.info(f"time par nb: {time1/len(nb_name_list)}")
-            logging.info(f"num of detected subgraph par nb: {self.detected_count/len(nb_name_list)}")
-        return time1,time2,n_count2,time3,n_count3,self.detected_count, len(nb_name_list)
- 
     # 使用
     # 工夫「ワークフロー構造の考慮」あり
     def real_subgraph_matching_part_A(self, limit=None, nb_limit=None):
@@ -2209,181 +1820,7 @@ class WorkflowMatching:
     def set_flg_subgraph_matching_mode(self, subgraph_matching_mode):
         self.subgraph_matching_mode=subgraph_matching_mode
         logging.info(f"self.subgraph_matching_mode={subgraph_matching_mode}")
-
-    # 不使用
-    def real_subgraph_matching_part_weaving_with_timecount(self, limit=None, nb_limit=None, flg_knn=False):
-        """
-        先に関数set_db_graphでデータベースから読み込んでグラフをself.Gに格納している必要あり．
-        サブグラフマッチングを一括で行う．
-        クエリグラフはself.QueryGraph
-
-        少しだけ参考: https://github.com/qinshimeng18/subgraph-matching/blob/master/main.py
-
-        self.attributes:
-            self.ans_list (list[list[Node]]): サブグラフマッチングで検索したサブグラフのノード集合のリストのリスト．
-
-        Returns:
-            float: この関数全体の処理時間
-            float: サブグラフが検出された開始ノードに対し，次の開始ノードのセットなどを除く処理時間
-            int-like: サブグラフが検出された開始ノードの数
-            float: サブグラフが検出されなかった開始ノードに対し，次の開始ノードのセットなどを除く処理時間
-            int-like: サブグラフが検出されなかった開始ノードの数
-            int-like: 検出されたサブグラフの個数
-        """
-        start_time1 = timeit.default_timer()
-        time2=0
-        n_count2=0
-        time3=0
-        n_count3=0
-        self.detected_count=0
-        
-        visited=[]
-        matched=[]
-        count=0 #あとで消す
-        #nb_name_list=[] #あとで消す
-
-        #有効なnb名をセット
-        self.set_valid_nb_name()
-
-        query_label=self.attr_of_q_node_type[self.query_root]
-        node_db_list=[]
-        if query_label in ["Cell", "Var", "Display_data"]:
-            node_db_list=self.all_node_list[query_label]
-            #for node_name, node_label in self.attr_of_db_node_type.items():
-            #    if node_label == query_label:
-            #        node_db_list.append(node_name)
-        else: # クエリのrootがOneWildcardまたはAnyWildcardのとき
-            node_db_list=self.G.nodes() # list[str]
-
-        visited_db=[]
-
-
-        for node_db in node_db_list:
-            if node_db in visited_db:
-                continue
-            # node_db (str): データベースのノートブックをワークフロー化したグラフのノード
-            nb_name=self.attr_of_db_nb_name[node_db]
-            if nb_name not in self.valid_nb_name:
-                continue
-            if self.flg_running_faster["chk_invalid_by_workflow_structure"] and self.chk_invalid_by_workflow_structure(nb_name):
-                continue
-            # *********以下 あとで消す***************************************************
-            #if (not limit is None) and count>=limit: #あとで消す
-            #    break #あとで消す
-            #if  (not nb_limit is None) and len(self.ans_list) > nb_limit: #あとで消す
-            #    break #あとで消す
-            #if nb_name not in nb_name_list: #あとで消す
-            #    nb_name_list.append(nb_name) #あとで消す
-                #logging.info(f"nb name: {nb_name}") #あとで消す
-            # *********以上 あとで消す***************************************************
-
-            
-            ret_list=[]
-            #logging.info("detecting subgraph...")
-            roop_count=0
-            matched=[]
-            visited=[]
-            if nb_name not in self.ans_list:
-                self.ans_list[nb_name]=[]
-            if nb_name not in self.nb_score:
-                self.nb_score[nb_name]=0.0
-
-            lib_rel=self.calc_lib_rel_with_timecount(nb_name)
-            
-            current_score=0
-            # self.calculated_sim に計算結果を保存してあとから参照できるので，ここでの計算はあとで活用できるためそこまで時間のロスにはならないはず
-            if self.flg_prune_under_sim([self.query_root], lib_rel+self.calc_rel_with_timecount(self.query_root, node_db)):
-                continue
-
-
-            # knnグラフ構成後
-            next_node_list=[node_db]
-
-            for node_db2 in next_node_list:
-                if node_db2 in visited_db:
-                    continue
-                self.flg_detection=False
-
-                
-                #_ =self.rec_new4_weaving(ret_list, self.query_root, node_db2, visited, matched, nb_name, current_score=0)
-                #if self.subgraph_matching_mode==2:
-                #    start_time2 = timeit.default_timer()
-                #    _ =self.rec_new4_weaving2(ret_list, self.query_root, node_db2, visited, matched, nb_name, current_score=0)
-                #    end_time2 = timeit.default_timer()
-                #if self.subgraph_matching_mode==3:
-                #    start_time2 = timeit.default_timer()
-                #    _ =self.rec_new4_weaving3(ret_list, self.query_root, node_db2, visited, matched, nb_name, current_score=self.calc_rel_with_timecount(self.query_root, node_db))
-                #    end_time2 = timeit.default_timer()
-                #if self.flg_rec_chk:
-                #    start_time2 = timeit.default_timer()
-                #    _ =self.rec_new4_weaving3_chk(ret_list, self.query_root, node_db2, visited, matched, nb_name, current_score=lib_rel+self.calc_rel_with_timecount(self.query_root, node_db))
-                #    end_time2 = timeit.default_timer()
-                #else:
-                if self.subgraph_matching_mode==3:
-                    start_time2 = timeit.default_timer()
-                    _ =self.rec_new4_weaving3(ret_list, self.query_root, node_db2, visited, matched, nb_name, current_score=lib_rel+self.calc_rel_with_timecount(self.query_root, node_db))
-                    end_time2 = timeit.default_timer()
-                elif self.subgraph_matching_mode==4:
-                    start_time2 = timeit.default_timer()
-                    _ =self.rec_new4_weaving4(ret_list, self.query_root, node_db2, visited, matched, nb_name)
-                    end_time2 = timeit.default_timer()
-                visited_db.append(node_db2)
-
-                if self.flg_detection:
-                    n_count2+=1
-                    time2+=(end_time2-start_time2)
-                    count+=1 #あとで消す
-                else:
-                    n_count3+=1
-                    time3+=(end_time2-start_time2)
-
-                if flg_knn and self.calc_rel_with_timecount(self.query_root, node_db2) > self.change_next_node_thres:
-                    next_node_list.extend(self.KnnGraph.successors(node_db2))
-
-        end_time1 = timeit.default_timer()
-        time1 = end_time1 - start_time1
-
-        #print("")
-        #print("-------- ans_list --------")
-        #print(self.ans_list)
-        nb_count=len(self.ans_list)
-
-        logging.info("subgraph matching completed!")
-        logging.info(f"time of getting node list and subgraph matching: {time1}")
-        if n_count2==0:
-            logging.info(f"exist subgraph root: {time2}, {n_count2}")
-        else:
-            logging.info(f"exist subgraph root: {time2}, {n_count2}, per one root: {time2/n_count2}")
-        if n_count3==0:
-            logging.info(f"no subgraph root: {time3}, {n_count3}")
-        else:
-            logging.info(f"no subgraph root: {time3}, {n_count3}, per one root: {time3/n_count3}")
-        logging.info(f"detected subgraph: {self.detected_count}")
-        logging.info(f"calculated num of nb: {nb_count}")
-        if nb_count != 0:
-            logging.info(f"time par nb: {time1/nb_count}")
-            logging.info(f"num of detected subgraph par nb: {self.detected_count/nb_count}")
-        return time1,time2,n_count2,time3,n_count3,self.detected_count, nb_count
     
-    # 交互実行のアルゴリズムでのみ使用．他はcalc_lib_scoreを利用している．
-    def calc_lib_rel_with_timecount(self, nb_name):
-        calc_start_time = timeit.default_timer()
-        ret=self.calc_lib_rel(nb_name)
-        calc_end_time = timeit.default_timer()
-        self.calc_time_sum+=calc_end_time-calc_start_time
-        return ret
-
-    # 交互実行のアルゴリズムでのみ使用．他はcalc_lib_scoreを利用している．
-    def calc_lib_rel(self, nb_name):
-        if self.w_l==0:
-            return 0
-        if nb_name in self.calculated_lib_sim:
-            return self.calculated_lib_sim[nb_name] * self.w_l
-
-        lib_list=self.fetch_all_library_from_db(nb_name)
-        lib_rel=self.calc_lib_score(self.query_lib, lib_list)
-        self.calculated_lib_sim[nb_name]=lib_rel
-        return lib_rel * self.w_l
 
     # 使用
     def real_subgraph_matching_part_weaving_without_timecount(self, limit=None, nb_limit=None):
@@ -2564,12 +2001,12 @@ class WorkflowMatching:
         return c_count_sum, v_count_sum, min_c_count, min_v_count, max_c_count, max_v_count, len(node_count), o_count_sum, min_o_count, max_o_count
 
 
-    def set_flg_running_faster(self, flg_chk_invalid_by_workflow_structure=True, flg_flg_prune_under_sim=True, flg_optimize_calc_order=True, flg_caching=True, flg_calc_data_sim_approximately=False, flg_cache_query_table=False):
+    def set_flg_running_faster(self, flg_chk_invalid_by_workflow_structure=True, flg_flg_prune_under_sim=True, flg_optimize_calc_order=True, flg_caching=True, flg_cache_query_table=False):
         self.flg_running_faster["chk_invalid_by_workflow_structure"]=flg_chk_invalid_by_workflow_structure
         self.flg_running_faster["flg_prune_under_sim"]=flg_flg_prune_under_sim
         self.flg_running_faster["flg_optimize_calc_order"]=flg_optimize_calc_order
         self.flg_running_faster["flg_caching"]=flg_caching
-        self.flg_running_faster["flg_calc_data_sim_approximately"]=flg_calc_data_sim_approximately
+        self.flg_running_faster["flg_calc_data_sim_approximately"]=False
         self.flg_running_faster["flg_cache_query_table"]=flg_cache_query_table
         
 
@@ -3134,72 +2571,6 @@ class WorkflowMatching:
         else:
             return 0
 
-    # 不使用
-    def calc_rel_between_db_node_with_timecount(self, n1_name, n2_name):
-        """For development."""
-        calc_start_time = timeit.default_timer()
-        ret=self.calc_rel_between_db_node(n1_name, n2_name)
-        calc_end_time = timeit.default_timer()
-        self.calc_time_sum+=calc_end_time-calc_start_time
-        self.each_calc_time_sum[self.attr_of_db_node_type[n2_name]]+=calc_end_time-calc_start_time
-        return ret
-
-    # 不使用
-    def calc_rel_between_db_node(self, n1_name, n2_name):
-        """For development."""
-        class_code_relatedness=self.class_code_relatedness
-        if self.attr_of_db_node_type[n2_name] == "Cell" and self.attr_of_db_node_type[n1_name] == "Cell": #type: cell
-            if self.w_c==0:
-                return 0
-            if (n1_name, n2_name) in self.calculated_sim:
-                return self.calculated_sim[(n1_name, n2_name)] * self.w_c
-            n1_real_cell_id=self.attr_of_db_real_cell_id[n1_name]
-            n2_real_cell_id=self.attr_of_db_real_cell_id[n2_name]
-            #print(nb_name_A, nb_name_B, n1_real_cell_id, n2_real_cell_id)
-            #sim = self.calc_cell_rel(nb_name_A, nb_name_B, n1_real_cell_id, n2_real_cell_id, ver="jaccard_similarity_coefficient")
-            cleaned_nb_name_A=self.attr_of_db_nb_name[n1_name]
-            code_table_A=self.fetch_source_code_table(cleaned_nb_name_A)
-            code_A=code_table_A[code_table_A["cell_id"]==n1_real_cell_id]["cell_code"].values
-            code_A="".join(list(code_A))
-
-            cleaned_nb_name_B=self.attr_of_db_nb_name[n2_name]
-            code_table_B=self.fetch_source_code_table(cleaned_nb_name_B)
-            code_B=code_table_B[code_table_B["cell_id"]==n2_real_cell_id]["cell_code"].values
-            code_B="".join(list(code_B))
-
-            sim=class_code_relatedness.calc_code_rel_by_jaccard_index(code_A, code_B)
-            self.calculated_sim[(n1_name, n2_name)]=sim
-            return  sim * self.w_c
-        elif self.attr_of_db_node_type[n2_name] == "Var" and self.attr_of_db_node_type[n1_name] == "Var": #type: var
-            self.calc_v_count+=1
-            if self.w_v==0:
-                return 0
-            if (n1_name, n2_name) in self.calculated_sim:
-                return self.calculated_sim[(n1_name, n2_name)] * self.w_v
-            tableA=self.fetch_var_table(n1_name)
-            if tableA is None:
-                return 0.0
-            tableB=self.fetch_var_table(n2_name)
-            if tableB is None:
-                return 0.0
-            sim = self.calc_table_rel(tableA, tableB)
-            self.calculated_sim[(n1_name, n2_name)]=sim
-            return sim * self.w_v
-        elif self.attr_of_db_node_type[n2_name] == "Display_data" and self.attr_of_db_node_type[n1_name] == "Display_data": #type: Display_data
-            if self.w_d==0:
-                return 0
-            if n1_name not in self.attr_of_db_display_type:
-                return 0.0
-            if n2_name not in self.attr_of_db_display_type:
-                return 0.0
-            if self.attr_of_db_display_type[n2_name] == self.attr_of_db_display_type[n1_name]:
-                return self.w_d
-            else:
-                return 0.0
-        else:
-            logging.info(f"error: not match node type of workflow. {self.attr_of_db_display_type[n1_name]}, {self.attr_of_db_node_type[n2_name]}")
-            return 0.0
-
     # 使用
     def calc_nb_score3(self, w_c:float=None, w_v:float=None, w_l:float=None, w_d:float=None) -> Tuple[int, int]:
         """
@@ -3243,7 +2614,7 @@ class WorkflowMatching:
         return count, nb_count
 
     # 使用
-    def calc_nb_score3_2(self, w_c:float=None, w_v:float=None, w_l:float=None, w_d:float=None) -> Tuple[int, int]:
+    def calc_nb_score3_2(self, w_c:float=None, w_v:float=None, w_l:float=None, w_d:float=None, flg_juneau:bool=False, k_juneau:int=20) -> Tuple[int, int]:
         """
         For naive method and micro-benchmark for the proposal method.
         Time each calculations.（スコア計算部分の時間計測あり．）
@@ -3258,6 +2629,12 @@ class WorkflowMatching:
         self.set_flg_running_faster(False, False, False, False)
         self.init_each_calc_time_sum()
         self.set_each_w(w_c, w_v, w_l, w_d)
+        self.init_arranged_all_weights()
+        if flg_juneau:
+            self.set_table_group2() # Juneauを適用するのに必要
+            self.calc_all_tables_rel_using_juneau(k_juneau=k_juneau) #追加
+            self.init_query_col()
+            self.set_all_querytable_col()
 
         self.nb_score={}
         count=0
@@ -3275,7 +2652,13 @@ class WorkflowMatching:
                 for n_tuple in subgraph:
                     n1_name=n_tuple[0]
                     n2_name=n_tuple[1]
-                    g_score+=self.calc_rel_with_timecount(n1_name, n2_name)
+                    if flg_juneau and self.is_data_match(nodenameQ=n1_name, nodenameN=n2_name):
+                        if (n1_name, n2_name) in self.calculated_sim: #juneauで計算した類似度以外のデータ類似度はゼロにする
+                            g_score+= self.w_v * self.calculated_sim[(n1_name, n2_name)]
+                        else:
+                            pass # g_score+=0
+                    else:
+                        g_score+=self.calc_rel_with_timecount(n1_name, n2_name)
 
                 #logging.info("score is ", g_score)
                 if self.nb_score[nb_name] < g_score:
@@ -3349,6 +2732,7 @@ class WorkflowMatching:
         この関数ではデータ関連度を1つ計算するたびに類似度下限値との比較を行う．
         類似度下限値との比較の関数もver2_2より一部改良している．(計算回数を減らす)
         + flg_running_fasterの比較回数を最小限にした．
+        コード+出力+ライブラリ→データの順に計算順序を最適化．
         """
         self.init_query_col()
         self.set_all_querytable_col()
@@ -3358,7 +2742,9 @@ class WorkflowMatching:
         for w in [w_c, w_v, w_l, w_d]:
             if not w is None:
                 self.set_each_w(w_c, w_v, w_l, w_d)
-                break
+
+        self.init_arranged_all_weights()
+
         if not self.flg_running_faster["flg_prune_under_sim"]:
             # For micro-benchmark.
             return self.calc_nb_score3_2()
@@ -3395,8 +2781,6 @@ class WorkflowMatching:
                     n1_name=n_tuple[0]
                     n2_name=n_tuple[1]
                     current_score+=self.calc_rel_c_o_with_timecount(n1_name, n2_name)
-                    if self.flg_running_faster["flg_calc_data_sim_approximately"]:
-                        v_score_appr+=self.calc_rel_v_approximately(n1_name, n2_name)
             
                 #logging.info("score is ", current_score)
                 #subgraph_score[subgraph]=current_score
@@ -3407,10 +2791,7 @@ class WorkflowMatching:
 
 
         if self.flg_running_faster["flg_optimize_calc_order"]:
-            if self.flg_running_faster["flg_calc_data_sim_approximately"]:
-                sorted_subgraph=sorted(subgraph_score_appr.items(), key=lambda d: d[1], reverse=True)
-            else:
-                sorted_subgraph=sorted(subgraph_score.items(), key=lambda d: d[1], reverse=True)
+            sorted_subgraph=sorted(subgraph_score.items(), key=lambda d: d[1], reverse=True)
         else:
             sorted_subgraph=list(subgraph_score.items())
 
@@ -3451,7 +2832,135 @@ class WorkflowMatching:
             count+=1 #あとで消す
         nb_count+=1 #あとで消す
 
-        return count, nb_count #あとで消す
+        return count, nb_count 
+
+    # 使用 現状最速
+    def calc_nb_score_for_proposal_method_with_juneau(self, w_c:float=None, w_v:float=None, w_l:float=None, w_d:float=None, k_juneau=20):
+        """
+        juneauがある場合の最適化．
+        データ+出力+ライブラリ→コードの順に計算順序を最適化．
+        """
+        self.nb_score={}
+        for w in [w_c, w_v, w_l, w_d]:
+            if not w is None:
+                self.set_each_w(w_c, w_v, w_l, w_d)
+
+
+        if not self.flg_running_faster["flg_prune_under_sim"]:
+            # For micro-benchmark.
+            return self.calc_nb_score3_2()
+        if self.w_v==0:
+            return self.calc_nb_score_for_new_proposal_method_2_3_wv0()
+
+        #juneau準備
+        self.init_query_col()
+        self.set_all_querytable_col()
+        self.init_each_calc_time_sum()
+        self.calc_all_tables_rel_using_juneau(k_juneau=k_juneau) #追加
+        self.init_arranged_all_weights()
+
+        #v_count=len(self.query_table) # 下限値の導出に利用. 1サブグラフあたりのラベルがデータのペアの数.
+        c_count=len(self.query_cell_code) # 下限値の導出に利用. 1サブグラフあたりのラベルがデータのペアの数.
+
+        count=0
+        nb_count=0
+        lib_list1=self.query_lib
+
+        subgraph_id={}
+        subgraph_score={}
+        subgraph_nb_name={}
+        subgraph_score_appr={}
+        graph_id=0
+        
+        for nb_name in self.ans_list: # コード，ライブラリ，出力の類似度を計算
+            lib_list2 = self.fetch_all_library_from_db(nb_name)
+            lib_score = self.calc_lib_score(lib_list1, lib_list2)
+            for subgraph in self.ans_list[nb_name]:
+                graph_id+=1
+                current_score=0
+                v_score_appr=0
+                current_score += lib_score * self.w_l
+
+                for n_tuple in subgraph:
+                    n1_name=n_tuple[0]
+                    n2_name=n_tuple[1]
+                    if self.is_data_match(nodenameQ=n1_name, nodenameN=n2_name):
+                        if (n1_name, n2_name) in self.calculated_sim: #juneauで計算した類似度以外のデータ類似度はゼロにする
+                            current_score+= self.w_v * self.calculated_sim[(n1_name, n2_name)]
+                    #current_score+=self.calc_rel_c_o_with_timecount(n1_name, n2_name)
+                    else:
+                        current_score+=self.calc_rel_o_with_timecount(n1_name, n2_name)
+            
+                subgraph_id[graph_id]=subgraph
+                subgraph_score[graph_id]=current_score
+                subgraph_score_appr[graph_id]=current_score + v_score_appr
+                subgraph_nb_name[graph_id]=nb_name
+
+
+        if self.flg_running_faster["flg_optimize_calc_order"]:
+            sorted_subgraph=sorted(subgraph_score.items(), key=lambda d: d[1], reverse=True)
+        else:
+            sorted_subgraph=list(subgraph_score.items())
+
+
+        for pair in sorted_subgraph:
+            graph_id=pair[0]
+            #current_score = pair[1]
+            current_score = subgraph_score[graph_id]
+            nb_name=subgraph_nb_name[graph_id]
+            
+            if len(self.nb_score)<self.k:
+                k_score=0
+            else:
+                self.top_k_score=sorted(self.nb_score.items(), key=lambda d: d[1], reverse=True)
+                k_score=self.top_k_score[self.k-1][1]
+                
+            if self.flg_prune_under_sim_for_new_proposal_method_3(self.w_c, c_count, current_score, k_score):
+                continue
+
+            if nb_name not in self.nb_score:
+                self.nb_score[nb_name]=0
+            elif self.flg_prune_under_sim_for_new_proposal_method_3(self.w_c, c_count, current_score, self.nb_score[nb_name]):
+                continue
+
+            subgraph=subgraph_id[graph_id]
+            remain_c_count=c_count
+            for n_tuple in subgraph:
+                n1_name=n_tuple[0]
+                n2_name=n_tuple[1]
+                #v_score, remain_v_count=self.calc_rel_v_with_remain_count_with_timecount(n1_name, n2_name, remain_v_count)
+                c_score, remain_c_count=self.calc_rel_c_with_remain_number_with_timecount(n1_name, n2_name, remain_c_count)
+                current_score+=c_score
+                if remain_c_count==0 or self.flg_prune_under_sim_for_new_proposal_method_3(self.w_c, remain_c_count, current_score, max(k_score, self.nb_score[nb_name])):
+                    break
+
+            #logging.info("score is ", current_score)
+            if self.nb_score[nb_name] < current_score:
+                self.nb_score[nb_name]=current_score
+            count+=1 #あとで消す
+        nb_count+=1 #あとで消す
+
+        return count, nb_count 
+
+    def init_arranged_all_weights(self):
+        if len(self.query_cell_code) != 0:
+            self.w_c = self.w_c/len(self.query_cell_code)
+        if len(self.query_table) != 0:
+            self.w_v = self.w_v/len(self.query_table)
+        output_num = 0
+        for k,v in self.query_workflow_info["Display_data"].items():
+            output_num+=v
+        if output_num!=0:
+            self.w_d = self.w_d/output_num
+
+    def init_arranged_dataandoutput_weights(self):
+        if len(self.query_table) != 0:
+            self.w_v = self.w_v/len(self.query_table)
+        output_num = 0
+        for k,v in self.query_workflow_info["Display_data"].items():
+            output_num+=v
+        if output_num!=0:
+            self.w_d = self.w_d/output_num
 
     # 使用 現状最速
     def calc_nb_score_for_new_proposal_method_2_3_wv0(self) -> Tuple[int, int]:
@@ -3560,40 +3069,7 @@ class WorkflowMatching:
         ret=sorted_nb_score[:k_tmp]
         self.top_k_score=ret
         return ret
-         
-    def top_k_nb_with_display_data(self, k):
-        self.top_k_score_d={}
-        self.top_k_score_l=[]
-        for nb_name in self.ans_list:
-            for subgraph in self.ans_list[nb_name]:
-                for n_tuple in subgraph:
-                    if type(n_tuple[0]) == type("str"):
-                        self.calc_nb_score2()
-                    else:
-                        self.calc_nb_score()
-                    break
-                break
-            break
-
-        print(self.nb_score)
-            
-        sorted_nb_score = sorted(self.nb_score.items(), key=lambda x:x[1])
-        self.k = min(len(sorted_nb_score), k)
-        #self.top_k_score=sorted_nb_score[:self.k]
-
-        count=0
-        for nb_name in sorted_nb_score:
-            flg_lib_matched=True
-            display_db=self.fetch_multiset_of_display_type_from_db(nb_name)
-            for t in self.query_display_type:
-                if not t in display_db:
-                    flg_lib_matched=False
-                    break
-            if flg_lib_matched:
-                self.top_k_score_d[nb_name]=sorted_nb_score[nb_name]
-                self.top_k_score_l.append((nb_name, sorted_nb_score[nb_name]))  
-        print(self.top_k_score)       
-
+           
     def fetch_source_code_table(self, cleaned_nb_name:str) -> pd.DataFrame:
         """
         Fetch the table of source codes and return it in form of DataFrame.
@@ -4101,7 +3577,7 @@ class WorkflowMatching:
         if query_node_name not in self.query_acol_set:
             self.query_acol_set[query_node_name]=acol_set_A
 
-        matching = sorted(matching, key=lambda d: d[2], reverse=True) # 類似度が高い順にソート
+        matching = sorted(matching, key=lambda x: x[2], reverse=True) # 類似度が高い順にソート
     
         count=0
         max_count=min(len(scmaA), len(scmaB))
@@ -4209,34 +3685,6 @@ class WorkflowMatching:
                 logging.info("collecting library info : failed.")
         return self.library[cleaned_nb_name]
         
-
-    # 不使用
-    def fetch_library_in_particular_nb_from_db(self, nb_name):
-        """For development."""
-        if nb_name in self.library:
-            return self.library[nb_name]
-
-        logging.info("collecting library info...")
-        with self.postgres_eng.connect() as conn:
-            #conn = self.postgres_eng
-            #conn = self.postgres_eng.connect()
-            try:
-                lib_table = pd.read_sql_table("nb_libraries", conn, schema=f"{config.sql.nb_info}")
-                logging.info("***")
-                for _, row in lib_table.iterrows():
-                    print(row["nb_name"], row["libraries"])
-                for _, nb_name, lib in lib_table.iterrows():
-                    print(f"{_}, {nb_name}, {lib}")
-                    if nb_name not in self.library:
-                        self.library[nb_name]=[]
-                    if lib not in self.library[nb_name]:
-                        self.library[nb_name].append(lib)
-                logging.info("collecting library info : completed.")
-            except:
-                logging.info("collecting library info : failed.")
-        return self.library[nb_name]
-
-
     def fetch_multiset_of_display_type_from_db(self, cleaned_nb_name:str) -> list:# -> List[str]:
         """
         Returns:
@@ -4284,12 +3732,6 @@ class WorkflowMatching:
             except:
                 logging.info("collecting display type and cell id info : failed.")
         return self.display_type_and_cell_id[cleaned_nb_name]
-
-    # 不使用
-    def calc_library_sim(self, cleaned_nb_name1, cleaned_nb_name2):
-        lib_list1 = self.fetch_all_library_from_db(cleaned_nb_name1)
-        lib_list2 = self.fetch_all_library_from_db(cleaned_nb_name2)
-        return self.calc_lib_score(lib_list1, lib_list2)
 
     # 提案手法で使用
     def flg_prune_under_sim(self, visited:List[str], current_score:float, max_c_score:float=1, max_v_score:float=1, max_d_score:float=1) -> bool:
@@ -4533,33 +3975,6 @@ class WorkflowMatching:
         #self.each_calc_time_sum["Var"]+=(calc_var_end_time-calc_var_start_time) #重複（calc_rel_with_timecountですでに足されている）
         return ret_score
 
-    # 不使用
-    def get_sum_of_table_size(self):
-        q_table_size_sum=0
-        db_table_size_sum=0
-        valid_db_count=0
-        invalid_db_count=0
-        node_db_list=self.all_node_list["Var"]
-        for n_q in self.query_table:
-            q_table_size=self.get_table_size3(self.query_table[n_q])
-            q_table_size_sum+=q_table_size
-            for n_db in node_db_list:
-                if self.attr_of_db_node_type[n_db] != self.attr_of_q_node_type[n_q]:
-                    continue
-                nb_name=self.attr_of_db_nb_name[n_db]
-                if nb_name not in self.valid_nb_name:
-                    continue
-
-                table_db=self.fetch_var_table(n_db)
-                if type(table_db) == type(pd.DataFrame()):
-                    db_table_size=self.get_table_size3(table_db)
-                    db_table_size_sum+=db_table_size
-                    valid_db_count+=1
-                else:
-                    invalid_db_count+=1
-
-        return q_table_size_sum, db_table_size_sum, valid_db_count, invalid_db_count
-
     def existing_method_calc_code_sim(self):
         """
         Calculate code similarity for the code-based search method (C).
@@ -4656,42 +4071,67 @@ class WorkflowMatching:
     def set_based_method_calc_code_sim(self):
         """
         Calculate code similarity for the code-based search method (C).
-        セルを頭から結合したソースコードだけをみてtop-kのスコアにする．(self.nb_scoreにセット)
+        セルごとのソースコードをみてtop-kのスコアにする．(self.nb_scoreにセット)
         """
         class_code_relatedness=self.class_code_relatedness
+        nb_score={}
+        matched_pair=[]
+        matched_pair2=[]
 
         # get query source code
         query_code=self.combining_query_code()
 
-
         for nb_name in self.valid_nb_name:
+            sim_list=[]
             # get db nodebook source code
             db_code_table=self.fetch_source_code_table(nb_name)
             db_code_list=db_code_table["cell_code"].values
             # ********* oldに対して追加点 ***********
-            db_code_list2=[]
-            for code in db_code_list:
-                row_list=code.split("\n")
-                for row in row_list:
-                    if "#" in row:
-                        row=row[:row.index("#")]
-                        if row=="":
-                            continue
-                        db_code_list2.append(row)
-                    else:
-                        db_code_list2.append(row)
-            if len(db_code_list2)==0:
-                self.nb_score[nb_name]=0
-                continue
-            # ********* 上記，追加点 ***********
-            db_code="\n".join(db_code_list2) # oldに対して変更点 db_code_list -> db_code_list2
-            while "\n\n" in db_code:
-                db_code=db_code.replace("\n\n", "\n")
-            calc_code_start_time = timeit.default_timer()
-            sim=class_code_relatedness.calc_code_rel_by_jaccard_index(query_code, db_code)
-            calc_code_end_time = timeit.default_timer()
-            self.each_calc_time_sum["Cell"]+=calc_code_end_time-calc_code_start_time
-            self.nb_score[nb_name]=sim
+            for qNode in self.query_cell_code:
+                query_code = self.query_cell_code[qNode]
+                db_code_list2=[]
+                code_id = 0
+                for code in db_code_list:
+                    code_id+=1
+                    row_list=code.split("\n")
+                    for row in row_list:
+                        if "#" in row:
+                            row=row[:row.index("#")]
+                            if row=="":
+                                continue
+                            db_code_list2.append(row)
+                        else:
+                            db_code_list2.append(row)
+                    if len(db_code_list2)==0:
+                        sim_list.append((str(qNode), str(code_id), 0))
+                        continue
+                    db_code = "\n".join(db_code_list2)
+                    while "\n\n" in db_code:
+                        db_code=db_code.replace("\n\n", "\n")
+                    calc_code_start_time = timeit.default_timer()
+                    sim_tmp = class_code_relatedness.calc_code_rel_by_jaccard_index(query_code, db_code)
+                    sim_list.append((str(qNode), str(code_id), sim_tmp))
+                    calc_code_end_time = timeit.default_timer()
+                    self.each_calc_time_sum["Cell"]+=calc_code_end_time-calc_code_start_time
+                    db_code_list2=[]
+            num=len(self.query_cell_code)
+            self.sim_list_debug = sim_list
+            sorted_sim_list = sorted(sim_list, key=lambda x: x[2], reverse=True) # 類似度が高い順にソート
+            sim = 0
+            i = 0
+            j=0
+            while(j<num):
+                if i>=len(sorted_sim_list):
+                    break
+                if sorted_sim_list[i][0] not in matched_pair and sorted_sim_list[i][1] not in matched_pair2:
+                    sim += sorted_sim_list[i][2]
+                    matched_pair.append(sorted_sim_list[i][0])
+                    matched_pair2.append(sorted_sim_list[i][1])
+                    j+=1
+                i+=1
+            nb_score[nb_name]=sim
+            
+        return nb_score
 
     def combining_query_code(self) -> str:
         # get query source code
@@ -4741,11 +4181,16 @@ class WorkflowMatching:
         return sim
             
 
-    def existing_method_sum(self):
+    def existing_method_sum(self, if_codeSimPerCell=False):
         """
         Set-based search method w/o optimization.
         Save computational notebook similarity in self.nb_score.
         """
+        if if_codeSimPerCell:
+            self.init_arranged_all_weights()
+        else:
+            self.init_arranged_dataandoutput_weights()
+
         self.init_each_calc_time_sum()
         self.nb_score={}
         nb_score_according_to_table_sim={}
@@ -4755,7 +4200,12 @@ class WorkflowMatching:
             self.nb_score={}
         nb_score_according_to_code_sim={}
         if self.w_c!=0:
-            self.existing_method_calc_code_sim()
+            if if_codeSimPerCell:
+                # セル単位の類似度
+                nb_score_according_to_code_sim = self.set_based_method_calc_code_sim()
+            else:
+                self.existing_method_calc_code_sim()
+                nb_score_according_to_code_sim=self.nb_score
             nb_score_according_to_code_sim=self.nb_score
             self.nb_score={}
 
@@ -4771,9 +4221,11 @@ class WorkflowMatching:
                 lib_rel=0
             if self.w_d!=0:
                 output_rel = self.previous_calc_output_sim(nb_name)
+            else:
+                output_rel=0
             self.nb_score[nb_name]=lib_rel * self.w_l + nb_score_according_to_table_sim[nb_name] * self.w_v + nb_score_according_to_code_sim[nb_name] * self.w_c + output_rel*self.w_d
 
-    def existing_method_sum_fast_method(self, k:int):
+    def existing_method_sum_fast_method(self, k:int, if_codeSimPerCell=False, flg_juneau=False): 
         """
         Set-based search method with optimization.
         Save computational notebook similarity in self.nb_score.
@@ -4781,11 +4233,23 @@ class WorkflowMatching:
         Args:
             k (int): a natural number for top-k search on computational notebooks.
         """
+        if if_codeSimPerCell:
+            self.init_arranged_all_weights()
+        else:
+            self.init_arranged_dataandoutput_weights()
+            
         self.k=k
         self.init_each_calc_time_sum()
         self.nb_score={}
+        
+        if flg_juneau:
+            self.init_query_col()
+            self.set_all_querytable_col()
+
+        table_q_num=len(self.query_table)
+        code_q_num=len(self.query_cell_code)
         if not self.flg_running_faster["flg_prune_under_sim"]:
-            self.existing_method_sum()
+            self.existing_method_sum(if_codeSimPerCell=if_codeSimPerCell)
         else:
             if self.w_v==0:
                 self.existing_method_sum_fast_method_w_v0()
@@ -4793,8 +4257,12 @@ class WorkflowMatching:
                 current_nb_score={}
                 nb_score_according_to_code_sim={}
                 if self.w_c!=0:
-                    self.existing_method_calc_code_sim()
-                    nb_score_according_to_code_sim=self.nb_score
+                    if if_codeSimPerCell:
+                        # セル単位の類似度
+                        nb_score_according_to_code_sim = self.set_based_method_calc_code_sim()
+                    else:
+                        self.existing_method_calc_code_sim()
+                        nb_score_according_to_code_sim=self.nb_score
                     self.nb_score={}
 
                 for nb_name in self.valid_nb_name:
@@ -4805,7 +4273,9 @@ class WorkflowMatching:
                         lib_rel=self.calc_lib_score(self.query_lib, lib_list2)
                     else:
                         lib_rel=0
-                    current_nb_score[nb_name] = lib_rel * self.w_l + nb_score_according_to_code_sim[nb_name] * self.w_c
+                    current_nb_score[nb_name] = lib_rel * self.w_l
+                    if code_q_num!=0:
+                        current_nb_score[nb_name] += nb_score_according_to_code_sim[nb_name] * self.w_c / code_q_num
                     if self.w_d!=0:
                         current_nb_score[nb_name]+= self.previous_calc_output_sim(nb_name)*self.w_d
 
@@ -4824,9 +4294,10 @@ class WorkflowMatching:
                         else:
                             self.top_k_score=sorted(self.nb_score.items(), key=lambda d: d[1], reverse=True)
                             k_score=self.top_k_score[self.k-1][1]
-                        if self.flg_prune_under_sim_for_new_proposal_method(v_count=n_q_num, current_score=current_nb_score[nb_name], compare_score=k_score, max_v_score=self.w_v):
-                            continue
-                        self.nb_score[nb_name]=current_nb_score[nb_name]+self.w_v*self.existing_method_calc_table_sim_particular_nb(nb_name)
+                        if table_q_num!=0:
+                            if self.flg_prune_under_sim_for_new_proposal_method(v_count=n_q_num, current_score=current_nb_score[nb_name], compare_score=k_score, max_v_score=self.w_v/table_q_num):
+                                continue
+                            self.nb_score[nb_name]=current_nb_score[nb_name]+self.w_v*self.existing_method_calc_table_sim_particular_nb(nb_name)/table_q_num
             
     def existing_method_sum_fast_method_w_v0(self):
         """
@@ -6820,14 +6291,17 @@ class WorkflowMatching:
         return notebooks_code_sim
 
 
-    def existing_method_sum_using_juneau(self):
+    def existing_method_sum_using_juneau(self, if_codeSimPerCell=False):
         """
         Set-based search method w/o optimization.
         Save computational notebook similarity in self.nb_score.
 
         ノード数による調整あり．
+        if_codeSimPerCell=False: コードは全体的な類似性を見る．
+        if_codeSimPerCell=True: コードはセル単位で局所的な類似性を見る．
         """
         self.init_each_calc_time_sum()
+        self.init_arranged_all_weights()
         self.nb_score={}
         table_q_num=len(self.query_table)
         code_q_num=len(self.query_cell_code)
@@ -6837,7 +6311,10 @@ class WorkflowMatching:
         if self.w_v!=0:
             nb_score_according_to_table_sim=self.existing_method_calc_table_sim_using_juneau()
         if self.w_c!=0:
-            nb_score_according_to_code_sim=self.existing_method_calc_code_sim2()
+            if if_codeSimPerCell:
+                nb_score_according_to_code_sim=self.set_based_method_calc_code_sim()
+            else:
+                nb_score_according_to_code_sim=self.existing_method_calc_code_sim2()
 
         for nb_name in self.valid_nb_name:
             if nb_name not in nb_score_according_to_table_sim:

@@ -1,15 +1,6 @@
 from django import forms
 from .models import QueryLibrary, QueryNode, QueryEdge, QueryJson
 
-class HelloForm(forms.Form):
-    data=[
-        ('サンプル1', '1'),
-        ('サンプル2', '2'),
-        ('サンプル3', '3'),
-    ]
-    choice = forms.ChoiceField(label='sample_label',choices=data) #choice: nameフィールド. HTMLでname="choice"と同じ.
-
-
 class SelectNodeForm(forms.Form):
     data=[]
     for node in QueryNode.objects.all():
