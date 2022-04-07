@@ -22,11 +22,11 @@ from typing import Tuple, Union, List # annotations
 
 from py2neo import Node, Relationship, NodeMatcher, RelationshipMatcher
 from mymodule.config import config
-from juneau.utils.funclister import FuncLister
-from juneau.db.table_db import generate_graph
+from module2.utils.funclister import FuncLister
+from module2.db.table_db import generate_graph
 from mymodule.code_relatedness import CodeRelatedness
 from mymodule.code_similarity import CodeSimilarity
-from juneau.db.schemamapping import SchemaMapping
+from module2.db.schemamapping import SchemaMapping
 #from lib import CodeComparer
 
 NUM_STR_LIST = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
@@ -2630,6 +2630,11 @@ class WorkflowMatching:
         self.init_each_calc_time_sum()
         self.set_each_w(w_c, w_v, w_l, w_d)
         self.init_arranged_all_weights()
+        if flg_juneau:
+            self.set_table_group2() # Juneauを適用するのに必要
+            self.calc_all_tables_rel_using_juneau(k_juneau=k_juneau) #追加
+            self.init_query_col()
+            self.set_all_querytable_col()
 
         self.nb_score={}
         count=0
@@ -2647,7 +2652,13 @@ class WorkflowMatching:
                 for n_tuple in subgraph:
                     n1_name=n_tuple[0]
                     n2_name=n_tuple[1]
-                    g_score+=self.calc_rel_with_timecount(n1_name, n2_name)
+                    if flg_juneau and self.is_data_match(nodenameQ=n1_name, nodenameN=n2_name):
+                        if (n1_name, n2_name) in self.calculated_sim: #juneauで計算した類似度以外のデータ類似度はゼロにする
+                            g_score+= self.w_v * self.calculated_sim[(n1_name, n2_name)]
+                        else:
+                            pass # g_score+=0
+                    else:
+                        g_score+=self.calc_rel_with_timecount(n1_name, n2_name)
 
                 #logging.info("score is ", g_score)
                 if self.nb_score[nb_name] < g_score:
@@ -2721,6 +2732,7 @@ class WorkflowMatching:
         この関数ではデータ関連度を1つ計算するたびに類似度下限値との比較を行う．
         類似度下限値との比較の関数もver2_2より一部改良している．(計算回数を減らす)
         + flg_running_fasterの比較回数を最小限にした．
+        コード+出力+ライブラリ→データの順に計算順序を最適化．
         """
         self.init_query_col()
         self.set_all_querytable_col()
@@ -2812,6 +2824,114 @@ class WorkflowMatching:
                 v_score, remain_v_count=self.calc_rel_v_with_remain_count_with_timecount(n1_name, n2_name, remain_v_count)
                 current_score+=v_score
                 if remain_v_count==0 or self.flg_prune_under_sim_for_new_proposal_method(remain_v_count, current_score, max(k_score, self.nb_score[nb_name])):
+                    break
+
+            #logging.info("score is ", current_score)
+            if self.nb_score[nb_name] < current_score:
+                self.nb_score[nb_name]=current_score
+            count+=1 #あとで消す
+        nb_count+=1 #あとで消す
+
+        return count, nb_count 
+
+    # 使用 現状最速
+    def calc_nb_score_for_proposal_method_with_juneau(self, w_c:float=None, w_v:float=None, w_l:float=None, w_d:float=None, k_juneau=20):
+        """
+        juneauがある場合の最適化．
+        データ+出力+ライブラリ→コードの順に計算順序を最適化．
+        """
+        self.nb_score={}
+        for w in [w_c, w_v, w_l, w_d]:
+            if not w is None:
+                self.set_each_w(w_c, w_v, w_l, w_d)
+
+
+        if not self.flg_running_faster["flg_prune_under_sim"]:
+            # For micro-benchmark.
+            return self.calc_nb_score3_2()
+        if self.w_v==0:
+            return self.calc_nb_score_for_new_proposal_method_2_3_wv0()
+
+        #juneau準備
+        self.init_query_col()
+        self.set_all_querytable_col()
+        self.init_each_calc_time_sum()
+        self.calc_all_tables_rel_using_juneau(k_juneau=k_juneau) #追加
+        self.init_arranged_all_weights()
+
+        #v_count=len(self.query_table) # 下限値の導出に利用. 1サブグラフあたりのラベルがデータのペアの数.
+        c_count=len(self.query_cell_code) # 下限値の導出に利用. 1サブグラフあたりのラベルがデータのペアの数.
+
+        count=0
+        nb_count=0
+        lib_list1=self.query_lib
+
+        subgraph_id={}
+        subgraph_score={}
+        subgraph_nb_name={}
+        subgraph_score_appr={}
+        graph_id=0
+        
+        for nb_name in self.ans_list: # コード，ライブラリ，出力の類似度を計算
+            lib_list2 = self.fetch_all_library_from_db(nb_name)
+            lib_score = self.calc_lib_score(lib_list1, lib_list2)
+            for subgraph in self.ans_list[nb_name]:
+                graph_id+=1
+                current_score=0
+                v_score_appr=0
+                current_score += lib_score * self.w_l
+
+                for n_tuple in subgraph:
+                    n1_name=n_tuple[0]
+                    n2_name=n_tuple[1]
+                    if self.is_data_match(nodenameQ=n1_name, nodenameN=n2_name):
+                        if (n1_name, n2_name) in self.calculated_sim: #juneauで計算した類似度以外のデータ類似度はゼロにする
+                            current_score+= self.w_v * self.calculated_sim[(n1_name, n2_name)]
+                    #current_score+=self.calc_rel_c_o_with_timecount(n1_name, n2_name)
+                    else:
+                        current_score+=self.calc_rel_o_with_timecount(n1_name, n2_name)
+            
+                subgraph_id[graph_id]=subgraph
+                subgraph_score[graph_id]=current_score
+                subgraph_score_appr[graph_id]=current_score + v_score_appr
+                subgraph_nb_name[graph_id]=nb_name
+
+
+        if self.flg_running_faster["flg_optimize_calc_order"]:
+            sorted_subgraph=sorted(subgraph_score.items(), key=lambda d: d[1], reverse=True)
+        else:
+            sorted_subgraph=list(subgraph_score.items())
+
+
+        for pair in sorted_subgraph:
+            graph_id=pair[0]
+            #current_score = pair[1]
+            current_score = subgraph_score[graph_id]
+            nb_name=subgraph_nb_name[graph_id]
+            
+            if len(self.nb_score)<self.k:
+                k_score=0
+            else:
+                self.top_k_score=sorted(self.nb_score.items(), key=lambda d: d[1], reverse=True)
+                k_score=self.top_k_score[self.k-1][1]
+                
+            if self.flg_prune_under_sim_for_new_proposal_method_3(self.w_c, c_count, current_score, k_score):
+                continue
+
+            if nb_name not in self.nb_score:
+                self.nb_score[nb_name]=0
+            elif self.flg_prune_under_sim_for_new_proposal_method_3(self.w_c, c_count, current_score, self.nb_score[nb_name]):
+                continue
+
+            subgraph=subgraph_id[graph_id]
+            remain_c_count=c_count
+            for n_tuple in subgraph:
+                n1_name=n_tuple[0]
+                n2_name=n_tuple[1]
+                #v_score, remain_v_count=self.calc_rel_v_with_remain_count_with_timecount(n1_name, n2_name, remain_v_count)
+                c_score, remain_c_count=self.calc_rel_c_with_remain_number_with_timecount(n1_name, n2_name, remain_c_count)
+                current_score+=c_score
+                if remain_c_count==0 or self.flg_prune_under_sim_for_new_proposal_method_3(self.w_c, remain_c_count, current_score, max(k_score, self.nb_score[nb_name])):
                     break
 
             #logging.info("score is ", current_score)
@@ -4105,9 +4225,8 @@ class WorkflowMatching:
                 output_rel=0
             self.nb_score[nb_name]=lib_rel * self.w_l + nb_score_according_to_table_sim[nb_name] * self.w_v + nb_score_according_to_code_sim[nb_name] * self.w_c + output_rel*self.w_d
 
-    def existing_method_sum_fast_method(self, k:int, if_codeSimPerCell=False): 
+    def existing_method_sum_fast_method(self, k:int, if_codeSimPerCell=False, flg_juneau=False): 
         """
-        TODO:flg_using_juneau追加
         Set-based search method with optimization.
         Save computational notebook similarity in self.nb_score.
 
@@ -4122,6 +4241,10 @@ class WorkflowMatching:
         self.k=k
         self.init_each_calc_time_sum()
         self.nb_score={}
+        
+        if flg_juneau:
+            self.init_query_col()
+            self.set_all_querytable_col()
 
         table_q_num=len(self.query_table)
         code_q_num=len(self.query_cell_code)
@@ -6178,6 +6301,7 @@ class WorkflowMatching:
         if_codeSimPerCell=True: コードはセル単位で局所的な類似性を見る．
         """
         self.init_each_calc_time_sum()
+        self.init_arranged_all_weights()
         self.nb_score={}
         table_q_num=len(self.query_table)
         code_q_num=len(self.query_cell_code)

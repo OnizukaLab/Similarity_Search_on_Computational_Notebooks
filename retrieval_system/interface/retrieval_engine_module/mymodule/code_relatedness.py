@@ -13,13 +13,20 @@ import numpy as np
 import networkx as nx
 import re
 
-sys.path.append('/Users/runa/Desktop/大学/4年/実装/my_code/juneau_copy')
-sys.path.append('/Users/runa/Desktop/大学/4年/実装/my_code/core-detection_copy/lib')
+current_dir=os.getcwd()
+if os.path.exists(f"{current_dir}/interface/retrieval_engine_module/module2"):
+    module2_path=f"{current_dir}/interface/retrieval_engine_module/module2"
+    flg_loading=True
+    sys.path.append(module2_path)
+else:
+    logging.error("module2 is not found in code_relatedness.py.")
+    logging.error(f"{current_dir}/interface/retrieval_engine_module/module2")
+    exit(1)
 from py2neo import Node, Relationship, NodeMatcher, RelationshipMatcher
-from juneau.config import config
-from juneau.utils.funclister import FuncLister
-from juneau.db.table_db import generate_graph, pre_vars
-from juneau.search.search_prov_code import ProvenanceSearch
+from module2.config import config
+from module2.utils.funclister import FuncLister
+from module2.db.table_db import generate_graph, pre_vars
+from module2.search.search_prov_code import ProvenanceSearch
 #from lib import CodeComparer
 
 

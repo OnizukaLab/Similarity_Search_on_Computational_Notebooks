@@ -28,34 +28,28 @@ current_dir=os.getcwd()
 search_engine_path=f"{current_dir}/interface/retrieval_engine_module"
 upper_dir=current_dir[:current_dir.rfind("/Similarity_Search_on_Computational_Notebooks/")]
 flg_loading=False
-if os.path.exists(f"{upper_dir}/juneau_copy"):
-    juneau_file_path=f"{upper_dir}/juneau_copy"
+if os.path.exists(f"{current_dir}/interface/retrieval_engine_module/module2"):
+    module2_path=f"{current_dir}/interface/retrieval_engine_module/module2"
     flg_loading=True
-    sys.path.append(juneau_file_path)
-elif os.path.exists(f"{current_dir}/interface/retrieval_engine_module/juneau_copy"):
-    juneau_file_path=f"{current_dir}/interface/retrieval_engine_module/juneau_copy"
-    flg_loading=True
-    sys.path.append(juneau_file_path)
-elif os.path.exists(f"{upper_dir}/juneau"):
-    juneau_file_path=f"{upper_dir}/juneau" 
-    flg_loading=True
-    sys.path.append(juneau_file_path)
+    sys.path.append(module2_path)
+else:
+    logging.error("module2 is not found.")
+    exit(1)
 sys.path.append(search_engine_path)
 sys.path.append(f"{search_engine_path}/mymodule")
 
 ##
 #  Import the required classes. 各種必要なクラスをインポートする
 ##
-# Import Juneau. Juneauのインポート
-from juneau.db.table_db import connect2db_engine, connect2gdb
+from module2.db.table_db import connect2db_engine, connect2gdb
 from mymodule.config import config
 # Import our proposed method. 提案検索手法インポート
 from workflow_matching import WorkflowMatching
 
 if flg_loading:
-    logging.info(f"Loading Juneau is successful!: {juneau_file_path}")
+    logging.info(f"Loading module2 is successful!: {module2_path}")
 else:
-    logging.error("Please arrange your files with the search system and Juneau. The details is written in README.md.")
+    logging.error("Please arrange your files with the search system and module2. The details is written in README.md.")
 
 # Global variables for the search engine (holding a instance for the search). データベース読み込み短縮のための，インスタンス保持変数
 G_in_this_nb=None
