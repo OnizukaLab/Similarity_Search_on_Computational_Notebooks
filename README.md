@@ -13,10 +13,9 @@ Input a query through a browser interface and output Top-10 similar Jupyter note
 
 ![Demo](/retrieval_system/images/Demo_gif3_2.gif "demo")
 
-[Demo1 old version](https://drive.google.com/file/d/1x1yiM8xQkwlJtQmQPgIOiSyN2d3QoUBu/view?usp=sharing)
-
-[Demo2 old version](https://drive.google.com/file/d/19CfahRTEwlbaOSZQLLfiALocrVQ3SNkH/view?usp=sharing)
-
+If the demo is not displayed, see following files on google drive.
+[demo 1](https://drive.google.com/file/d/1v2GsEWBz4TRddJAyp10hB_7RxMSBSasu/view?usp=sharing)
+[demo 2](https://drive.google.com/file/d/1v2GsEWBz4TRddJAyp10hB_7RxMSBSasu/view?usp=sharing)
 
 ### Experimental evaluation
 
