@@ -91,7 +91,7 @@ python manage.py runserver <port>
 ```
 
 Then use interface by accessing
-http://127.0.0.1:<port>/interface/ .
+http://127.0.0.1:port/interface/ .
 
 For example, if you want use port 8080, run following command:
 
