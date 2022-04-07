@@ -1,0 +1,2 @@
+Columns are (notebook ID, data score, code score, library score, output score, score of contents' flow and relationships, comprehensive score).
+The range of each score is 1-5, and good notebooks as a search results are nearer to 5.
