@@ -13,7 +13,7 @@ Input a query through a browser interface and output Top-10 similar Jupyter note
 
 ![Demo](/retrieval_system/images/Demo_gif3_2.gif "demo")
 
-If the demo is not displayed, see following files on google drive.
+If the demo is not displayed, see retrieval_system/images/Demo_gif3_2.gif on this repository or following files on google drive.
 
 [demo 1](https://drive.google.com/file/d/1v2GsEWBz4TRddJAyp10hB_7RxMSBSasu/view?usp=sharing)
 
