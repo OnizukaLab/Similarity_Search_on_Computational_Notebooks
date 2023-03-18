@@ -1,6 +1,6 @@
 """
-TODO:calc_v_microbenchmark["load"]を廃止．
-TODO:コード類似度計算をcode_similarityに統一．
+TODO:calc_v_microbenchmark["load"]を廃止
+TODO:コード類似度計算をcode_similarityに統一
 """
 
 import logging
@@ -107,6 +107,9 @@ class WorkflowMatching:
         self.load_json={}
         self.flg_use_artifical_dataset=False
         self.schema_element_sample_col={}
+        self.data_profile={} # {int: [str]}, {data ID: a list of data node names}
+        self.datanametodataID = None #self.readDataCache(cachemode="small") #データIDを取得（同じデータは同じID）
+        self.flg_useDataCache = False
 
 
 
@@ -1565,9 +1568,9 @@ class WorkflowMatching:
             int-like: 検出されたサブグラフの個数
         """
         start_time1 = timeit.default_timer()
-        time2=0
+        time2=0 # マッチするサブグラフがあったときの時間の合計
         n_count2=0
-        time3=0
+        time3=0 # マッチするサブグラフがなかったときの時間の合計
         n_count3=0
         self.detected_count=0
         
@@ -2352,6 +2355,7 @@ class WorkflowMatching:
         self.each_calc_time_sum[self.attr_of_db_node_type[n2_name]]+=calc_end_time-calc_start_time
         return ret1, ret2
 
+    """
     def calc_rel_v_approximately_with_timecount(self, n1_name, n2_name):
         calc_start_time = timeit.default_timer()
         ret=self.calc_rel_v_approximately(n1_name, n2_name)
@@ -2359,6 +2363,7 @@ class WorkflowMatching:
         self.calc_time_sum+=calc_end_time-calc_start_time
         self.each_calc_time_sum[self.attr_of_db_node_type[n2_name]]+=calc_end_time-calc_start_time
         return ret
+    """
 
     def is_code_match(self, nodenameQ, nodenameN):
         if self.attr_of_db_node_type[nodenameN] == "Cell" and self.attr_of_q_node_type[nodenameQ] == "Cell":
@@ -2386,8 +2391,9 @@ class WorkflowMatching:
         """
         if self.w_c==0:
             return 0
-        if (nodenameQ, nodenameN) in self.calculated_sim:
-            return self.calculated_sim[(nodenameQ, nodenameN)]
+        sim = self.loadContentsSim(nodenameQ, nodenameN)
+        if sim is not None:
+            return sim
         #n1_real_cell_id=self.attr_of_q_real_cell_id[nodenameQ]
         n2_real_cell_id=self.attr_of_db_real_cell_id[nodenameN]
         #sim = self.calc_cell_rel(nb_name_A, nb_name_B, n1_real_cell_id, n2_real_cell_id, ver="jaccard_similarity_coefficient")
@@ -2404,8 +2410,7 @@ class WorkflowMatching:
         else:
             sim=self.class_code_relatedness.calc_code_rel_by_jaccard_index(codeQ, codeN)
 
-        if self.flg_running_faster["flg_caching"]:
-            self.calculated_sim[(nodenameQ, nodenameN)]=sim
+        self.cacheContentsSim(nodenameQ, nodenameN, sim)
         return sim
 
     def wrapper_calc_data_sim(self, nodenameQ, nodenameN) -> float:
@@ -2418,16 +2423,16 @@ class WorkflowMatching:
             return 0.0
         if nodenameQ not in self.query_table:
             return 0.0
-        if (nodenameQ, nodenameN) in self.calculated_sim:
-            return self.calculated_sim[(nodenameQ, nodenameN)]
+        sim = self.loadContentsSim(nodenameQ, nodenameN)
+        if sim is not None:
+            return sim
 
         if self.flg_juneau:
             # Juneauをデータ類似度計算に使うとき．
             return self.wrapper_calc_one_data_similarity_using_juneau(tnameQ=nodenameQ,tnameN=nodenameN)
         else:
             score = self.inner_calc_data_sim(query_node_name=nodenameQ, tnameN=nodenameN)
-            if self.flg_running_faster["flg_caching"]:
-                self.calculated_sim[(nodenameQ, nodenameN)]=score
+            self.cacheContentsSim(nodenameQ, nodenameN, score)
             return score
 
     def wrapper_calc_output_sim(self, nodenameQ, nodenameN) -> int:
@@ -2466,7 +2471,10 @@ class WorkflowMatching:
 
         """
         if self.is_code_match(nodenameQ=n1_name, nodenameN=n2_name):
-            return  self.w_c * self.wrapper_calc_code_sim(nodenameQ=n1_name, nodenameN=n2_name)
+            if self.w_c > 0:
+                return  self.w_c * self.wrapper_calc_code_sim(nodenameQ=n1_name, nodenameN=n2_name)
+            else:
+                return  self.w_c * (1-self.wrapper_calc_code_sim(nodenameQ=n1_name, nodenameN=n2_name)) * -1
         elif self.is_data_match(nodenameQ=n1_name, nodenameN=n2_name):
             self.calc_v_count+=1
             """
@@ -2478,9 +2486,15 @@ class WorkflowMatching:
                 #    return 0.0
                 sim = self.calc_table_rel(tableA, tableB)
             """
-            return self.w_v * self.wrapper_calc_data_sim(nodenameQ=n1_name, nodenameN=n2_name)
+            if self.w_v > 0:
+                return self.w_v * self.wrapper_calc_data_sim(nodenameQ=n1_name, nodenameN=n2_name)
+            else:
+                return self.w_v * (1-self.wrapper_calc_data_sim(nodenameQ=n1_name, nodenameN=n2_name)) * -1
         elif self.is_output_match(nodenameQ=n1_name, nodenameN=n2_name):
-            return self.w_d * self.wrapper_calc_output_sim(nodenameQ=n1_name, nodenameN=n2_name)
+            if self.w_d > 0:
+                return self.w_d * self.wrapper_calc_output_sim(nodenameQ=n1_name, nodenameN=n2_name)
+            else:
+                return self.w_d * (1-self.wrapper_calc_output_sim(nodenameQ=n1_name, nodenameN=n2_name)) * -1
         else:
             #logging.info(f"error: not match node type of workflow. {self.attr_of_q_node_type[n1_name]}, {self.attr_of_db_node_type[n2_name]}")
             return 0.0
@@ -2488,9 +2502,15 @@ class WorkflowMatching:
     def calc_rel_c_o(self, n1_name:str, n2_name:str) -> float:
         """Call this function instead of 'calc_rel'(=l_theta, in our paper) when we want to calculate small cost similairty."""
         if self.is_code_match(nodenameQ=n1_name, nodenameN=n2_name):
-            return  self.w_c * self.wrapper_calc_code_sim(nodenameQ=n1_name, nodenameN=n2_name)
+            if self.w_c > 0:
+                return  self.w_c * self.wrapper_calc_code_sim(nodenameQ=n1_name, nodenameN=n2_name)
+            else:
+                return  self.w_c * (1-self.wrapper_calc_code_sim(nodenameQ=n1_name, nodenameN=n2_name)) * -1
         elif self.is_output_match(nodenameQ=n1_name, nodenameN=n2_name):
-            return self.w_d * self.wrapper_calc_output_sim(nodenameQ=n1_name, nodenameN=n2_name)
+            if self.w_d > 0:
+                return self.w_d * self.wrapper_calc_output_sim(nodenameQ=n1_name, nodenameN=n2_name)
+            else:
+                return self.w_d * (1-self.wrapper_calc_output_sim(nodenameQ=n1_name, nodenameN=n2_name)) * -1
         #elif self.is_data_match(nodenameQ=n1_name, nodenameN=n2_name):
         #    return 0
         else:
@@ -2509,14 +2529,21 @@ class WorkflowMatching:
         if self.is_code_match(nodenameQ=n1_name, nodenameN=n2_name):
             remain_c_count-=1
             sim = self.wrapper_calc_code_sim(nodenameQ=n1_name, nodenameN=n2_name)
-            return sim * self.w_c, remain_c_count
+            if self.w_c > 0:
+                weightedsim = self.w_c * sim
+            else:
+                weightedsim = self.w_c * (1-sim) * -1
+            return weightedsim, remain_c_count
         else:
             return 0.0, remain_c_count
 
     def calc_rel_o(self, n1_name:str, n2_name:str) -> float:
         """Call this function instead of 'calc_rel' when you want calculate only output similarity."""
         if self.is_output_match(nodenameQ=n1_name, nodenameN=n2_name):
-            return self.w_d * self.wrapper_calc_output_sim(nodenameQ=n1_name, nodenameN=n2_name)
+            if self.w_d > 0:
+                return self.w_d * self.wrapper_calc_output_sim(nodenameQ=n1_name, nodenameN=n2_name)
+            else:
+                return self.w_d * (1-self.wrapper_calc_output_sim(nodenameQ=n1_name, nodenameN=n2_name)) * -1
         else:
             return 0.0
 
@@ -2524,7 +2551,10 @@ class WorkflowMatching:
         """Call this function instead of 'calc_rel' when you want calculate only data similarity."""
         if self.is_data_match(nodenameQ=n1_name, nodenameN=n2_name):
             self.calc_v_count+=1
-            return self.w_v * self.wrapper_calc_data_sim(nodenameQ=n1_name, nodenameN=n2_name)
+            if self.w_v > 0:
+                return self.w_v * self.wrapper_calc_data_sim(nodenameQ=n1_name, nodenameN=n2_name)
+            else:
+                return self.w_v * (1-self.wrapper_calc_data_sim(nodenameQ=n1_name, nodenameN=n2_name)) * -1
         else:
             return 0.0
 
@@ -2545,14 +2575,16 @@ class WorkflowMatching:
             self.calc_v_count+=1
             remain_v_count-=1
             sim=self.w_v * self.wrapper_calc_data_sim(nodenameQ=n1_name, nodenameN=n2_name)
-            return sim * self.w_v, remain_v_count
+            if self.w_v > 0:
+                weightedsim = self.w_v * sim
+            else:
+                weightedsim = self.w_v * (1-sim) * -1
+            return weightedsim, remain_v_count
         else:
             return 0.0, remain_v_count
 
+    """
     def calc_rel_v_approximately(self, n1_name, n2_name):
-        """
-        For development.
-        """
         if self.w_v==0:
             return 0
         if self.is_data_match(nodenameQ=n1_name, nodenameN=n2_name):
@@ -2570,6 +2602,7 @@ class WorkflowMatching:
             return sim * self.w_v
         else:
             return 0
+    """
 
     # 使用
     def calc_nb_score3(self, w_c:float=None, w_v:float=None, w_l:float=None, w_d:float=None) -> Tuple[int, int]:
@@ -2653,8 +2686,9 @@ class WorkflowMatching:
                     n1_name=n_tuple[0]
                     n2_name=n_tuple[1]
                     if flg_juneau and self.is_data_match(nodenameQ=n1_name, nodenameN=n2_name):
-                        if (n1_name, n2_name) in self.calculated_sim: #juneauで計算した類似度以外のデータ類似度はゼロにする
-                            g_score+= self.w_v * self.calculated_sim[(n1_name, n2_name)]
+                        sim = self.loadContentsSim(n1_name, n2_name)
+                        if sim is not None: #juneauで計算した類似度以外のデータ類似度はゼロにする
+                            g_score+= self.w_v * sim
                         else:
                             pass # g_score+=0
                     else:
@@ -2885,8 +2919,9 @@ class WorkflowMatching:
                     n1_name=n_tuple[0]
                     n2_name=n_tuple[1]
                     if self.is_data_match(nodenameQ=n1_name, nodenameN=n2_name):
-                        if (n1_name, n2_name) in self.calculated_sim: #juneauで計算した類似度以外のデータ類似度はゼロにする
-                            current_score+= self.w_v * self.calculated_sim[(n1_name, n2_name)]
+                        sim = self.loadContentsSim(n1_name, n2_name)
+                        if sim is not None: #juneauで計算した類似度以外のデータ類似度はゼロにする
+                            current_score+= self.w_v * sim
                     #current_score+=self.calc_rel_c_o_with_timecount(n1_name, n2_name)
                     else:
                         current_score+=self.calc_rel_o_with_timecount(n1_name, n2_name)
@@ -5610,7 +5645,7 @@ class WorkflowMatching:
             tgroup = self.table_group[tname]
             for tnameB, tgroupB in self.table_group.items():
                 if tgroup == tgroupB:
-                    self.calculated_sim[(tnameA, tnameB)]=score
+                    self.cacheContentsSim(tnameA, tnameB, score)
 
     def calc_all_tables_rel_using_juneau(self, k_juneau:int=20):
         """
@@ -5943,7 +5978,7 @@ class WorkflowMatching:
         if self.flg_running_faster["flg_caching"]:
             gid = self.table_group[tnameN]
             for tnameN in self.table_group2[gid]:
-                self.calculated_sim[(tnameQ, tnameN)]=score
+                self.cacheContentsSim(tnameQ, tnameN, score)
         return score
 
 
@@ -6327,4 +6362,145 @@ class WorkflowMatching:
             if code_q_num!=0:
                 self.nb_score[nb_name] += nb_score_according_to_code_sim[nb_name] * self.w_c / code_q_num
 
+
+    
+    def data_profiling(self, datanode_cur):
+        flg_profiled = False
+        data_cur=self.fetch_var_table(datanode_cur)
+        max_dataid = 0
+        for dataid, datanodelist in self.data_profile.items():
+            comparenode = datanodelist[0]
+            data_compare=self.fetch_var_table(comparenode)
+            if data_compare.equals(data_cur):
+                self.data_profile[dataid].append(datanode_cur)
+                flg_profiled = True
+            if flg_profiled:
+                break
+            max_dataid = max(max_dataid, dataid)
+        if not flg_profiled:
+            self.data_profile[max_dataid+1]=[datanode_cur]
+            
+    def profile_all_data(self, cachemode="small"):
+        """
+        データにIDを付与して，IDごとにそのデータを使用している計算ノートブック名をストアする（キャッシュ）
+        """
+        def getOriginalDataList():
+            originalDataList = []
+            checked_nb = set()
+            cellnode_and_id = sorted(self.attr_of_db_node_type, key=lambda d: d[1], reverse=True) #降順
+            for cellnode in cellnode_and_id:
+            #for cellnode, cellID in self.attr_of_db_node_type.items():
+                if self.attr_of_db_nb_name[cellnode] in checked_nb:
+                    continue
+                for childnode in self.G.successors(cellnode):
+                    if self.attr_of_db_node_type[childnode] == "Var":
+                        originalDataList.append(childnode)
+                        checked_nb.add(self.attr_of_db_nb_name[cellnode])
+            return originalDataList
+
+        if cachemode == "small":
+            originalDataList = getOriginalDataList()
+            for node in originalDataList:
+                self.data_profiling(datanode_cur=node)
+        elif cachemode == "all":
+            for node, nodetype in self.attr_of_db_node_type.items():
+                if nodetype == "Var":
+                    self.data_profiling(datanode_cur=node)
+
+    def WrapperOfDataProfile(self, cachemode="small"):
+        self.data_profile={}
+        starttime = timeit.default_timer()
+        self.profile_all_data(cachemode)
+        endtime = timeit.default_timer()
+        logging.info(endtime - starttime)
+        logging.info("Seconds")
+        logging.info((endtime - starttime)/60)
+        logging.info("Minutes")
+        if cachemode == "small":
+            small_data_profile = self.data_profile
+        elif cachemode == "all":
+            all_data_profile = self.data_profile
+
+    def transformdict2df(self, data_profile):
+        # 全データの方でも2秒ぐらいで終わる
+        colname = ["DataID", "DataName"]
+        storedataframe = pd.DataFrame(index=[], columns=colname)
+
+        for k, datalist in data_profile.items():
+            for dataname in datalist:
+                appenddf = pd.DataFrame([[k, dataname]], columns=colname)
+                storedataframe = storedataframe.append(appenddf, ignore_index=True)
+        return storedataframe
+
+    def savedataID(self, data_profile, cachemode="small"):
+        with self.postgres_eng.connect() as conn:
+            conn.execute(
+                f"CREATE SCHEMA IF NOT EXISTS datacache;" 
+        )
+        storedataframe = self.transformdict2df(data_profile)
+        
+        if cachemode == "small":
+            storename = "idtodatanamesmall"
+        elif cachemode == "all":
+            storename = "idtodataname"
+        
+        try:
+            storedataframe.to_sql(
+                name=storename,
+                con=self.postgres_eng.connect(),
+                schema=config.sql.datacache, 
+                if_exists="replace", #既にあった場合は置き換え
+                index=False,
+            )
+        except Exception as e:
+            logging.error(f"Unable to store 'datacache' due to error {e}")
+
+    def readDataCache(self, cachemode="small"):
+        """
+        cachemode: 'small' or 'all'
+        return dict{data name: data ID}
+        """
+        if cachemode == "small":
+            with self.postgres_eng.connect() as conn:
+                readdataIDlist = pd.read_sql_table(f"idtodatanamesmall", conn, schema=f"datacache")
+        elif cachemode == "all":
+            with self.postgres_eng.connect() as conn:
+                readdataIDlist = pd.read_sql_table(f"idtodataname", conn, schema=f"datacache")
+        else:
+            logging.info("error: failed to get cache for dataID")
+            
+        datanametodataID = {}
+        for row in readdataIDlist.itertuples():
+            datanametodataID[row.DataName] = row.DataID
+
+        return datanametodataID
+
+    def cacheContentsSim(self, querynode, targetnode, similarityscore):
+        """
+        if self.flg_running_faster["flg_caching"]:
+            self.calculated_sim[(nodenameQ, nodenameN)]=sim
+        を以下に変更すると同一．
+        self.cacheContentsSim(nodenameQ, nodenameN, sim)
+        """
+        if self.flg_running_faster["flg_caching"]:
+            if self.flg_useDataCache and targetnode in self.datanametodataID and not self.flg_juneau:
+                    self.calculated_sim[(querynode, self.datanametodataID[targetnode])]=similarityscore
+            else:
+                self.calculated_sim[(querynode, targetnode)]=similarityscore
+
+    def loadContentsSim(self, querynode, targetnode):
+        """
+        if (nodenameQ, nodenameN) in self.calculated_sim:
+            return self.calculated_sim[(nodenameQ, nodenameN)]
+        を以下に変更すると同一．
+        sim = self.loadContentsSim(nodenameQ, nodenameN)
+        if sim is not None:
+            return sim
+        """
+        if self.flg_running_faster["flg_caching"]:
+            if (querynode, targetnode) in self.calculated_sim:
+                return self.calculated_sim[(querynode, targetnode)]
+            elif self.flg_useDataCache and targetnode in self.datanametodataID and (querynode, self.datanametodataID[targetnode]) in self.calculated_sim:
+                return self.calculated_sim[(querynode, self.datanametodataID[targetnode])]
+        return None
 

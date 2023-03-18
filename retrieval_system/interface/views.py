@@ -18,7 +18,7 @@ from .models import QueryLibrary, QueryNode, QueryEdge, QueryJson
 from .forms import SelectNodeForm, SelectEdgeForm, SelectSavedQueryForm, SelectParentNodeForm, UploadQueryFileForm, UploadTableDataFileForm, SelectTypeForm
 
 
-flg_get_db_graph = True # For development (run search parts or not). 検索部分を動かすかどうか. 
+flg_get_db_graph = False # For development (run search parts or not). 検索部分を動かすかどうか. 
 
 
 # ***** Run the followings automatically when this system is started. システム起動時に実行される - ここから *****
@@ -29,6 +29,7 @@ search_engine_path=f"{current_dir}/interface/retrieval_engine_module"
 upper_dir=current_dir[:current_dir.rfind("/Similarity_Search_on_Computational_Notebooks/")]
 flg_loading=False
 if os.path.exists(f"{current_dir}/interface/retrieval_engine_module/module2"):
+    logging.info("Loading module2.")
     module2_path=f"{current_dir}/interface/retrieval_engine_module/module2"
     flg_loading=True
     sys.path.append(module2_path)
@@ -246,7 +247,6 @@ def form(request, *args, **kwargs):
     else:
         pass
 
-
     if "setting_button" in request_data:
         if request_data["setting_button"] == "Reset":
             delete_all()
@@ -392,7 +392,9 @@ def form(request, *args, **kwargs):
         "libraries_list": libraries_list,
         "search_time": "",
         "form_upload_query": UploadQueryFileForm(),
+        "form_upload_data": UploadTableDataFileForm(),
         }
+        
     if search_time != 0:
         msg["search_time"]=f"({round(search_time,1)} sec.)"
 

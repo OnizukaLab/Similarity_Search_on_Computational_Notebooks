@@ -10,6 +10,7 @@ sql:
   nb_info: ${env:SQL_INFO, nb_info}
   nottablevar: ${env:SQL_NOTTABLEVAR, not_table_var}
   knn_sim_list: ${env:KNN_LIST, knn_sim_list}
+  datacache: ${env:DATACACHE, datacache}
 neo:
   name: ${env:NEO_NAME,neo4j}
   password: ${env:NEO_PASSWORD,habitat1}

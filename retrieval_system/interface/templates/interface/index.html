@@ -128,22 +128,26 @@ Jupyter Notebook Similarity Search System
             <div class="form_wrapper2">
                 <form class="input_form2" action="{% url 'interface:form' %}" method='POST'>
                     {% csrf_token %}
-                    Set weights<br/>
+                    Set weights (check dissimilar contents)<br/>
                     <label class="label_weight">code: </label>
                     <input type="range" id="code_weight" name="code_weight" min="0" max="10" step="0.5" value={{code_weight}}>
                     <span id="current-code_weight">{{code_weight}}</span>
+                    <input type="checkbox" id="dissim-code_weight" />
                     <br/>
                     <label class="label_weight">data: </label>
                     <input type="range" id="data_weight" name="data_weight" min="0" max="10" step="0.5" value={{data_weight}}>
                     <span id="current-data_weight">{{data_weight}}</span>
+                    <input type="checkbox" id="dissim-data_weight" />
                     <br/>
                     <label class="label_weight">library: </label>
                     <input type="range" id="library_weight" name="library_weight" min="0" max="10" step="0.5" value={{library_weight}}>
                     <span id="current-library_weight">{{library_weight}}</span>
+                    <input type="checkbox" id="dissim-library_weight" />
                     <br/>
                     <label class="label_weight">output: </label>
                     <input type="range" id="output_weight" name="output_weight" min="0" max="10" step="0.5" value={{output_weight}}>
                     <span id="current-output_weight">{{output_weight}}</span>
+                    <input type="checkbox" id="dissim-output_weight" />
                     <br/>
                     <br/>
                     <input type="submit" name="setting_weight_button" value="Set"> 
@@ -166,7 +170,7 @@ Jupyter Notebook Similarity Search System
                             {{l}}<br/>
                         {% endfor %}
                         <label for="add_library_mode"></label>
-                        <select id="add_library_mode">
+                        <select id="add_library_mode" name="add_library_mode">
                         <option value="mode_codes" selected>Copy and paste source code importing library</option>
                         <option value="mode_librarynames">Input library names separated by comma or new line</option>
                         </select>

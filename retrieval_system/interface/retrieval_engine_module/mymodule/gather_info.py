@@ -17,7 +17,18 @@ from threading import Lock
 
 
 current_dir=os.getcwd()
-sys.path.append(f"{current_dir}/interface/retrieval_engine_module/module2")
+if os.path.exists(f"{current_dir}/interface/retrieval_engine_module/module2"):
+    module2_path=f"{current_dir}/interface/retrieval_engine_module/module2"
+    flg_loading=True
+    sys.path.append(module2_path)
+elif os.path.exists(f"{current_dir}/Similarity_Search_on_Computational_Notebooks/retrieval_system/interface/retrieval_engine_module"):
+    module2_path=f"{current_dir}/Similarity_Search_on_Computational_Notebooks/retrieval_system/interface/retrieval_engine_module"
+    flg_loading=True
+    sys.path.append(module2_path)
+else:
+    logging.error("module2 is not found in gather_info.py.")
+    logging.error(f"{current_dir}/interface/retrieval_engine_module/module2")
+    exit(1)
 from module2.config import config
 from module2.db.schemamapping import SchemaMapping
 from module2.db.table_db import generate_graph, pre_vars
